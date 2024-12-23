@@ -10,15 +10,33 @@ from .project_config import NextDataConfig
 class PulumiContextManager:
     def __init__(self):
         self.config = NextDataConfig.from_env()
-        self.stack = None
-        self.table_bucket = None
-        self.table_namespace = None
-        self.tables = {}  # Keep track of tables by name
+        self._stack = None
+        self._table_bucket = None
+        self._table_namespace = None
+        self._tables = {}  # Keep track of tables by name
+
+    @property
+    def stack(self):
+        if not self._stack:
+            self.initialize_stack()
+        return self._stack
+
+    @property
+    def table_bucket(self):
+        if not self._table_bucket:
+            self.ensure_base_resources()
+        return self._table_bucket
+
+    @property
+    def table_namespace(self):
+        if not self._table_namespace:
+            self.ensure_base_resources()
+        return self._table_namespace
 
     def initialize_stack(self):
         """Initialize or get existing stack"""
-        if not self.stack:
-            self.stack = auto.create_or_select_stack(
+        if not self._stack:
+            self._stack = auto.create_or_select_stack(
                 stack_name=self.config.stack_name,
                 project_name=self.config.project_name.lower().replace("-", "_"),
                 program=self.construct_pulumi_program,
@@ -30,19 +48,19 @@ class PulumiContextManager:
 
     def ensure_base_resources(self):
         """Ensure bucket and namespace exist"""
-        if not self.table_bucket:
+        if not self._table_bucket:
             bucket_name = f"{self.config.project_slug}tables"
-            self.table_bucket = aws.s3tables.TableBucket(
+            self._table_bucket = aws.s3tables.TableBucket(
                 bucket_name,
                 name=bucket_name,
             )
 
-        if not self.table_namespace:
+        if not self._table_namespace:
             namespace_name = f"{self.config.project_slug}namespace"
-            self.table_namespace = aws.s3tables.Namespace(
+            self._table_namespace = aws.s3tables.Namespace(
                 namespace_name,
                 namespace=namespace_name,
-                table_bucket_arn=self.table_bucket.arn,
+                table_bucket_arn=self._table_bucket.arn,
             )
 
     def create_table(self, table_path: str):
@@ -60,8 +78,8 @@ class PulumiContextManager:
             table = aws.s3tables.Table(
                 safe_name,
                 name=safe_name,  # Use safe name for both resource and table name
-                table_bucket_arn=self.table_bucket.arn,
-                namespace=self.table_namespace.namespace.apply(
+                table_bucket_arn=self._table_bucket.arn,
+                namespace=self._table_namespace.namespace.apply(
                     lambda ns: ns.replace("-", "_")
                 ),
                 format="ICEBERG",
@@ -71,7 +89,7 @@ class PulumiContextManager:
             pulumi.export(f"table_{safe_name}", table.warehouse_location)
 
             # Store the table reference
-            self.tables[safe_name] = table
+            self._tables[safe_name] = table
 
         try:
             self.initialize_stack()
@@ -99,17 +117,17 @@ class PulumiContextManager:
                     c if c.isalnum() else "_" for c in table_name.lower()
                 )
 
-                if safe_name not in self.tables:
+                if safe_name not in self._tables:
                     table = aws.s3tables.Table(
                         safe_name,
                         name=safe_name,  # Use safe name for both resource and table name
-                        table_bucket_arn=self.table_bucket.arn,
-                        namespace=self.table_namespace.namespace.apply(
+                        table_bucket_arn=self._table_bucket.arn,
+                        namespace=self._table_namespace.namespace.apply(
                             lambda ns: ns.replace("-", "_")
                         ),
                         format="ICEBERG",
                     )
-                    self.tables[safe_name] = table
+                    self._tables[safe_name] = table
                     pulumi.export(f"table_{safe_name}", table.warehouse_location)
 
     def create_stack(self):

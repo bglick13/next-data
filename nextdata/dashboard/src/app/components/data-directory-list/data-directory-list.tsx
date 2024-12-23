@@ -1,6 +1,8 @@
 "use client";
 
 import { useSuspenseQuery } from "@tanstack/react-query";
+import { DataTable } from "./data-table";
+import { columns } from "./columns";
 
 export function DataDirectoryList() {
   const { data } = useSuspenseQuery({
@@ -9,13 +11,12 @@ export function DataDirectoryList() {
       fetch("http://localhost:8000/api/data_directories").then((res) =>
         res.json()
       ),
-    refetchInterval: 1000,
+    refetchInterval: undefined,
   });
   return (
-    <div>
-      {data.directories.map((d: string) => (
-        <div key={d}>{d}</div>
-      ))}
+    <div className="container mx-auto p-4">
+      <h1 className="text-2xl font-bold tracking-tight">Data Directories</h1>
+      <DataTable data={data.directories} columns={columns} />
     </div>
   );
 }

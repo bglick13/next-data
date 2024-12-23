@@ -1,4 +1,4 @@
-import { DataDirectoryList } from "./components/data-directory-list";
+import { DataDirectoryList } from "./components/data-directory-list/data-directory-list";
 import { getQueryClient } from "./get-query-client";
 import { HydrationBoundary, dehydrate } from "@tanstack/react-query";
 
@@ -13,7 +13,6 @@ export default function Home() {
   });
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
-      <h1>Hello World</h1>
       <DataDirectoryList />
     </HydrationBoundary>
   );

@@ -3,10 +3,11 @@ from pathlib import Path
 import click
 import dotenv
 
-from nextdata.cli.ndx_context_manager import NdxContextManager
+from nextdata.cli.commands import NDX_SINGLETON
 
 from ..project_generator import NextDataGenerator
 from .pulumi import pulumi
+from .dev_server import dev_server
 
 dotenv.load_dotenv(Path.cwd() / ".env")
 
@@ -18,6 +19,7 @@ def cli():
 
 
 cli.add_command(pulumi)
+cli.add_command(dev_server)
 
 
 @cli.command(name="create-ndx-app")
@@ -43,10 +45,10 @@ To get started:
 
 
 @cli.command(name="dev")
-def dev():
+@click.option("--skip-init", is_flag=True, help="Skip initialization of the stack")
+def dev(skip_init: bool):
     """Start development server and watch for data changes"""
-    ndx_context_manager = NdxContextManager()
-    ndx_context_manager.start()
+    NDX_SINGLETON.start(skip_init=skip_init)
 
 
 @cli.command(name="list-templates")
