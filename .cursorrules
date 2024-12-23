@@ -1,0 +1,26 @@
+We are bulding a Nextjs like framework for organizing data and pipelines.
+I want to build a framework in python with a CLI, that initializes a "Next Data" project.
+Next Data is an opinionated way to structure data and data pipelines, using file based routing and file naming conventions.
+Each "data route" should automatically create an S3 Table.
+It should be easy to write transformations that automatically run on an Amazon EMR cluster and write to new tables.
+There should be an accompanying web app with a UI that automatically shows data schemas and dependencies
+After each session, update the .cursorrules file with the new changes. Keep track of requirements and open TODOs.
+
+# Requirements
+
+- [ ] A data directory that corresponds to each data source
+- [ ] A dashboard that shows data schemas and dependencies
+- [ ] Drag and drop UI in the dashboard for creating new data routes and uploading data
+- [ ] A CLI (ndx) for creating a new Next Data project
+- [ ] A connections directory that contains all the connections to external data sources
+- [ ] File name conventions for common patterns like etl, retl, etc.
+- [ ] An NdxContext that builds a typed object model for the data and available connections, making it easy to read data and write transformations to external data sources
+- [ ] @local and @remote decorators to easily run scripts either locally or on an EMR cluster
+- [ ] Use Pulumi to manage AWS resources
+
+# TODOs
+
+- [ ] Create a CLI for creating a new Next Data project
+- [ ] Add template files
+- [ ] Add a dashboard for viewing data schemas and dependencies
+- [ ] Add file listener that automatically creates new tables when new files are added to the data directory

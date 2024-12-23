@@ -1,0 +1,5 @@
+examples/default/.env
+nextdata/templates/default/venv
+*.pyc
+**__pycache__
+__pycache__/

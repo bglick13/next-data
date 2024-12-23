@@ -1,0 +1,14 @@
+# Include all template files
+recursive-include nextdata/templates *.py
+recursive-include nextdata/templates *.json
+recursive-include nextdata/templates *.yaml
+recursive-include nextdata/templates *.env
+recursive-include nextdata/templates .gitignore
+recursive-include nextdata/templates .env
+
+# Include all static files
+recursive-include nextdata/static *
+
+# Include package data
+include nextdata/templates/default/cookiecutter.json
+include nextdata/templates/default/{{cookiecutter.project_slug}}/.env

@@ -1,0 +1,8 @@
+Metadata-Version: 2.1
+Name: nextdata
+Version: 0.1.0
+Requires-Dist: click>=8.0.0
+Requires-Dist: watchdog>=2.1.0
+Requires-Dist: fastapi>=0.68.0
+Requires-Dist: uvicorn>=0.15.0
+Requires-Dist: cookiecutter>=2.1.0
