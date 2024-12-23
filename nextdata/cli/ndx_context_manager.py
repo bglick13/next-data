@@ -162,15 +162,43 @@ class NdxContextManager:
                         # Get the table bucket from Pulumi context
                         table_bucket = self.pulumi_context_manager.table_bucket
                         click.echo(f"Got table bucket: {table_bucket}")
-                        response = {
-                            "id": request["id"],
-                            "resource": {
-                                "arn": table_bucket.arn.get(),
-                                "name": table_bucket.name.get(),
-                            },
-                        }
-                        click.echo(f"Sending response: {response}")
-                        self.resource_response_queue.put(response)
+
+                        # Create a future to store the result
+                        future = asyncio.Future()
+
+                        def handle_outputs(arn_name_tuple):
+                            arn, name = arn_name_tuple
+                            response = {
+                                "id": request["id"],
+                                "resource": {
+                                    "arn": arn,
+                                    "name": name,
+                                },
+                            }
+                            if not future.done():
+                                future.set_result(response)
+                            return response
+
+                        # Set up the output handling
+                        table_bucket.arn.apply(
+                            lambda arn: table_bucket.name.apply(
+                                lambda name: handle_outputs((arn, name))
+                            )
+                        )
+
+                        # Wait for the result
+                        try:
+                            response = await asyncio.wait_for(future, timeout=5.0)
+                            click.echo(f"Sending response: {response}")
+                            self.resource_response_queue.put(response)
+                        except asyncio.TimeoutError:
+                            click.echo("Timeout waiting for Pulumi outputs")
+                            self.resource_response_queue.put(
+                                {
+                                    "id": request["id"],
+                                    "error": "Timeout waiting for resource info",
+                                }
+                            )
                 except queue.Empty:
                     pass
 

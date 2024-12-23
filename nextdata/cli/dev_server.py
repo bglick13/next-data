@@ -112,8 +112,7 @@ class DevServer:
             try:
                 connection_check = spark.sql("SELECT 1").collect()
                 return {
-                    "status": "healthy",
-                    "connection_check": connection_check,
+                    "status": "healthy" if connection_check else "unhealthy",
                     "pulumi_stack": self.config.stack_name,
                 }
             except Exception as e:
