@@ -3,13 +3,14 @@ import queue
 import threading
 import asyncio
 import click
-import webbrowser
 import signal
 from watchdog.observers import Observer
 
+from nextdata.cli.types import StackOutputs
+
 from .data_directory_handler import DataDirectoryHandler
 from .pulumi_context_manager import PulumiContextManager
-from .dev_server import DevServer
+from .dev_server.main import DevServer
 
 
 class NdxContextManager:
@@ -149,6 +150,36 @@ class NdxContextManager:
                 click.echo(f"Error processing event: {str(e)}", err=True)
                 await asyncio.sleep(1)  # Wait longer on error
 
+    def _get_stack_outputs(self) -> StackOutputs:
+        """Get stack outputs from the main thread"""
+        stack_outputs = self.pulumi_context_manager.stack.export_stack()
+        secrets_providers = stack_outputs.deployment["secrets_providers"]
+        secrets_state = secrets_providers["state"]
+        project_name = secrets_state["project"]
+        stack_name = secrets_state["stack"]
+        resources: list[dict] = stack_outputs.deployment["resources"]
+        table_bucket = next(
+            (
+                r
+                for r in resources
+                if r["type"] == "aws:s3tables/tableBucket:TableBucket"
+            ),
+            None,
+        )
+        table_namespace = next(
+            (r for r in resources if r["type"] == "aws:s3tables/namespace:Namespace"),
+            None,
+        )
+        tables = [r for r in resources if r["type"] == "aws:s3tables/table:Table"]
+        return StackOutputs(
+            project_name=project_name,
+            stack_name=stack_name,
+            resources=resources,
+            table_bucket=table_bucket,
+            table_namespace=table_namespace,
+            tables=tables,
+        )
+
     async def _run_resource_processor(self):
         """Process resource requests from the dev server"""
         click.echo("Starting resource processor...")
@@ -158,38 +189,14 @@ class NdxContextManager:
                 try:
                     request = self.resource_request_queue.get_nowait()
                     click.echo(f"Got resource request: {request}")
-                    if request["type"] == "get_table_bucket":
-                        # Get the table bucket from Pulumi context
-                        table_bucket = self.pulumi_context_manager.table_bucket
-                        click.echo(f"Got table bucket: {table_bucket}")
-
-                        # Create a future to store the result
-                        future = asyncio.Future()
-
-                        def handle_outputs(arn_name_tuple):
-                            arn, name = arn_name_tuple
-                            response = {
-                                "id": request["id"],
-                                "resource": {
-                                    "arn": arn,
-                                    "name": name,
-                                },
-                            }
-                            if not future.done():
-                                future.set_result(response)
-                            return response
-
-                        # Set up the output handling
-                        table_bucket.arn.apply(
-                            lambda arn: table_bucket.name.apply(
-                                lambda name: handle_outputs((arn, name))
-                            )
-                        )
-
+                    if request["type"] == "get_stack_outputs":
+                        stack_outputs = self._get_stack_outputs()
+                        response = {
+                            "id": request["id"],
+                            "stack_outputs": stack_outputs.model_dump_json(),
+                        }
                         # Wait for the result
                         try:
-                            response = await asyncio.wait_for(future, timeout=5.0)
-                            click.echo(f"Sending response: {response}")
                             self.resource_response_queue.put(response)
                         except asyncio.TimeoutError:
                             click.echo("Timeout waiting for Pulumi outputs")

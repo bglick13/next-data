@@ -19,6 +19,7 @@ class PulumiContextManager:
     def stack(self):
         if not self._stack:
             self.initialize_stack()
+            self.ensure_base_resources()
         return self._stack
 
     @property
@@ -159,3 +160,7 @@ class PulumiContextManager:
             on_output=lambda msg: click.echo(f"Pulumi: {msg}")
         )
         return destroy_result
+
+    # def get_all_resources(self):
+    #     """Get all resources in the stack"""
+    #     export = self.stack.export_stack()

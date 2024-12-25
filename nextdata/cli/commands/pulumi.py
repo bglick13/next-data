@@ -1,3 +1,4 @@
+import json
 import click
 
 from nextdata.cli.commands import NDX_SINGLETON
@@ -31,3 +32,10 @@ def refresh():
 def destroy():
     """Pulumi destroy"""
     NDX_SINGLETON.pulumi_context_manager.destroy_stack()
+
+
+@pulumi.command(name="outputs")
+def outputs():
+    """Pulumi outputs"""
+    response = NDX_SINGLETON.pulumi_context_manager.stack.export_stack()
+    click.echo(json.dumps(response.deployment, indent=2))
