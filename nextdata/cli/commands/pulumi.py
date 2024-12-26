@@ -1,7 +1,7 @@
 import json
 import click
 
-from nextdata.cli.commands import NDX_SINGLETON
+from nextdata.core.pulumi_context_manager import PulumiContextManager
 
 
 @click.group()
@@ -13,29 +13,34 @@ def pulumi():
 @pulumi.command(name="up")
 def up():
     """Pulumi up"""
-    NDX_SINGLETON.pulumi_context_manager.create_stack()
+    pulumi_context_manager = PulumiContextManager()
+    pulumi_context_manager.create_stack()
 
 
 @pulumi.command(name="preview")
 def preview():
     """Pulumi preview"""
-    NDX_SINGLETON.pulumi_context_manager.preview_stack()
+    pulumi_context_manager = PulumiContextManager()
+    pulumi_context_manager.preview_stack()
 
 
 @pulumi.command(name="refresh")
 def refresh():
     """Pulumi refresh"""
-    NDX_SINGLETON.pulumi_context_manager.refresh_stack()
+    pulumi_context_manager = PulumiContextManager()
+    pulumi_context_manager.refresh_stack()
 
 
 @pulumi.command(name="destroy")
 def destroy():
     """Pulumi destroy"""
-    NDX_SINGLETON.pulumi_context_manager.destroy_stack()
+    pulumi_context_manager = PulumiContextManager()
+    pulumi_context_manager.destroy_stack()
 
 
 @pulumi.command(name="outputs")
 def outputs():
     """Pulumi outputs"""
-    response = NDX_SINGLETON.pulumi_context_manager.stack.export_stack()
+    pulumi_context_manager = PulumiContextManager()
+    response = pulumi_context_manager.stack.export_stack()
     click.echo(json.dumps(response.deployment, indent=2))

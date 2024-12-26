@@ -3,11 +3,15 @@ from watchdog.events import FileSystemEventHandler
 import click
 from queue import Queue
 
+from nextdata.core.pulumi_context_manager import PulumiContextManager
+
 
 class DataDirectoryHandler(FileSystemEventHandler):
     def __init__(self, event_queue: Queue):
         super().__init__()
         self.event_queue = event_queue
+        self.pulumi_context_manager = PulumiContextManager()
+        self.pulumi_context_manager.initialize_stack()
 
     def on_created(self, event):
         if event.is_directory:
@@ -17,9 +21,7 @@ class DataDirectoryHandler(FileSystemEventHandler):
                 if event_path.parent.name == "data":
                     click.echo(f"📁 New data directory created: {event_path.name}")
                     # Queue the event for processing in the main thread
-                    self.event_queue.put(
-                        {"type": "create_table", "path": event.src_path}
-                    )
+                    self.pulumi_context_manager.handle_table_creation(event.src_path)
             except Exception as e:
                 click.echo(f"❌ Error queueing table creation: {str(e)}", err=True)
 

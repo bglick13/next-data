@@ -1,7 +1,7 @@
 import asyncio
 import click
 
-from nextdata.cli.commands import NDX_SINGLETON
+from nextdata.cli.dev_server.main import DevServer
 
 
 @click.group()
@@ -18,6 +18,7 @@ def start():
     asyncio.set_event_loop(loop)
 
     try:
-        loop.run_until_complete(NDX_SINGLETON.dev_server.start_async())
+        dev_server = DevServer()
+        loop.run_until_complete(dev_server.start_async())
     finally:
         loop.close()

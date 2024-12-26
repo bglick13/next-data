@@ -1,4 +1,7 @@
-from pydantic import BaseModel
+from typing import Literal, Optional
+from fastapi import Form, HTTPException
+from fastapi.encoders import jsonable_encoder
+from pydantic import BaseModel, ValidationError
 
 
 class StackOutputs(BaseModel):
@@ -10,6 +13,37 @@ class StackOutputs(BaseModel):
     tables: list[dict]
 
 
+class SparkSchemaSpec(BaseModel):
+    schema: dict[
+        str,
+        Literal[
+            "STRING",
+            "DOUBLE",
+            "INT",
+            "FLOAT",
+            "BOOLEAN",
+            "TIMESTAMP",
+            "DATE",
+            "LONG",
+        ],
+    ]
+
+
 class UploadCsvRequest(BaseModel):
     table_name: str
     mode: str = "append"
+    schema: Optional[SparkSchemaSpec] = None
+
+
+class Checker:
+    def __init__(self, model: BaseModel):
+        self.model = model
+
+    def __call__(self, data: str = Form(...)):
+        try:
+            return self.model.model_validate_json(data)
+        except ValidationError as e:
+            raise HTTPException(
+                detail=jsonable_encoder(e.errors()),
+                status_code=422,
+            )

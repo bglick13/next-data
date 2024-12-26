@@ -1,18 +1,10 @@
 "use client";
 
-import { useSuspenseQuery } from "@tanstack/react-query";
-import { DataTable } from "./data-table";
+import { useDataDirectories } from "@/hooks/queries/useDataDirectories";
 import { columns } from "./columns";
-
+import { DataTable } from "@/components/ui/data-table";
 export function DataDirectoryList() {
-  const { data } = useSuspenseQuery({
-    queryKey: ["data_directories"],
-    queryFn: () =>
-      fetch("http://localhost:8000/api/data_directories").then((res) =>
-        res.json()
-      ),
-    refetchInterval: undefined,
-  });
+  const { data } = useDataDirectories();
   return (
     <div className="container mx-auto p-4">
       <h1 className="text-2xl font-bold tracking-tight">Data Directories</h1>

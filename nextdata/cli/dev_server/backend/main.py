@@ -1,15 +1,31 @@
 import tempfile
 from typing import Annotated
-from fastapi import FastAPI, Form
-from pyspark.sql import SparkSession
+from fastapi import FastAPI, Form, Query
 from fastapi.middleware.cors import CORSMiddleware
 import logging
+
+from nextdata.cli.dev_server.backend.deps.get_stack_outputs import get_stack_outputs
+from nextdata.core.pulumi_context_manager import PulumiContextManager
+from nextdata.core.connections.spark import SparkManager
+
 from .deps.get_pyspark_connection import pyspark_connection_dependency
-from nextdata.cli.types import StackOutputs, UploadCsvRequest
+from nextdata.cli.types import Checker, StackOutputs, UploadCsvRequest
 from pathlib import Path
 from fastapi import Depends, File, UploadFile, Path as FastAPI_Path
+from contextlib import asynccontextmanager
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    pulumi_context_manager = PulumiContextManager()
+    pulumi_context_manager.initialize_stack()
+    app.state.pulumi_context_manager = pulumi_context_manager
+    yield
+    app.state.clear()
+
+
+app_state = {}
+app = FastAPI(lifespan=lifespan)
 
 
 app.add_middleware(
@@ -23,14 +39,11 @@ app.add_middleware(
 
 @app.get("/api/health")
 async def health_check(
-    spark_stack_outputs: Annotated[
-        tuple[SparkSession, StackOutputs],
-        Depends(pyspark_connection_dependency),
-    ]
+    spark: Annotated[SparkManager, Depends(pyspark_connection_dependency)],
+    stack_outputs: Annotated[StackOutputs, Depends(get_stack_outputs)],
 ):
-    spark, stack_outputs = spark_stack_outputs
     try:
-        connection_check = spark.sql("SELECT 1").collect()
+        connection_check = spark.test_connection()
         return {
             "status": "healthy" if connection_check else "unhealthy",
             "pulumi_stack": stack_outputs.stack_name,
@@ -65,33 +78,30 @@ async def list_data_directories():
 
 @app.post("/api/upload_csv")
 async def upload_csv(
-    spark_stack_outputs: Annotated[
-        tuple[SparkSession, StackOutputs],
-        Depends(pyspark_connection_dependency),
-    ],
+    spark: Annotated[SparkManager, Depends(pyspark_connection_dependency)],
     file: UploadFile = File(...),
-    table_name: str = Form(...),
+    form_data: UploadCsvRequest = Depends(Checker(UploadCsvRequest)),
 ):
-    spark, stack_outputs = spark_stack_outputs
     data_dir = Path.cwd() / "data"
     valid_directories = [d.name for d in data_dir.iterdir() if d.is_dir()]
-    table_name_is_valid = table_name in valid_directories
-    logging.info(f"Table name {table_name} is valid: {table_name_is_valid}")
+    table_name_is_valid = form_data.table_name in valid_directories
+    logging.info(f"Table name {form_data.table_name} is valid: {table_name_is_valid}")
     if not table_name_is_valid:
         return {
             "status": "error",
-            "error": f"Table name {table_name} is not a valid directory",
+            "error": f"Table name {form_data.table_name} is not a valid directory",
         }
     try:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".csv") as temp_file:
             temp_file.write(file.file.read())
             temp_file_path = temp_file.name
-            df = spark.read.csv(temp_file_path, header=True, inferSchema=True)
-        values = df.toJSON().collect()
-        logging.info(f"Values: {values}")
-        sql_statement = f"insert into {stack_outputs.table_bucket['outputs']['name']}.{stack_outputs.table_namespace['outputs']['name']}.{table_name} values {values}"
-        logging.info(f"SQL Statement: {sql_statement}")
-        spark.sql(sql_statement)
+            df = spark.read_from_csv(temp_file_path)
+        logging.error(form_data.model_dump_json())
+        spark.write_to_table(
+            form_data.table_name,
+            df,
+            schema=form_data.schema,
+        )
         return {"status": "success", "filename": file.filename}
     except Exception as e:
         return {"status": "error", "error": str(e)}
@@ -99,14 +109,21 @@ async def upload_csv(
 
 @app.get("/api/table/{table_name}/metadata")
 async def get_table_metadata(
-    spark_stack_outputs: Annotated[
-        tuple[SparkSession, StackOutputs],
-        Depends(pyspark_connection_dependency),
-    ],
+    spark: Annotated[SparkManager, Depends(pyspark_connection_dependency)],
     table_name: str = FastAPI_Path(...),
 ):
-    spark, stack_outputs = spark_stack_outputs
-    row_count = spark.sql(
-        f"SELECT COUNT(*) FROM {stack_outputs.table_bucket['outputs']['name']}.{stack_outputs.table_namespace['outputs']['name']}.{table_name}"
-    ).collect()[0][0]
-    return {"status": "success", "row_count": row_count}
+    return spark.get_table_metadata(table_name)
+
+
+@app.get("/api/table/{table_name}/data")
+async def get_sample_data(
+    spark: Annotated[SparkManager, Depends(pyspark_connection_dependency)],
+    table_name: str = FastAPI_Path(...),
+    limit: int = Query(10),
+    offset: int = Query(0),
+):
+    return spark.read_from_table(
+        table_name,
+        limit,
+        offset,
+    )

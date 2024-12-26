@@ -1,2 +1,7 @@
 pulumi>=3.0.0,<4.0.0
 pulumi-aws>=6.0.2,<7.0.0
+pyspark>=3.5.0
+pyarrow>=14.0.1
+boto3>=1.33.6
+s3fs>=2023.12.1
+nest_asyncio>=1.5.8

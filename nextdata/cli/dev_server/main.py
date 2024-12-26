@@ -1,27 +1,61 @@
 import asyncio
+import queue
+import threading
+import time
 import click
 import subprocess
-import uvicorn
 import importlib.resources
-from queue import Queue
 import sys
-from pathlib import Path
+from watchdog.observers import Observer
+from nextdata.cli.data_directory_handler import DataDirectoryHandler
+from nextdata.core.project_config import NextDataConfig
 
 from .backend.main import app
 
 
 class DevServer:
-    def __init__(self, resource_request_queue: Queue, resource_response_queue: Queue):
+    def __init__(self):
+        self.config = NextDataConfig.from_env()
         self.dashboard_path = importlib.resources.files("nextdata") / "dashboard"
         self.backend_path = (
             importlib.resources.files("nextdata") / "dev_server" / "backend"
         )
+        self.event_queue = queue.Queue()
+        self.should_stop = threading.Event()
+        self.observer = None
+        self.watcher_thread = None
         self.frontend_process = None
         self.backend_process = None
         self.backend_app = app
-        # Store queues in FastAPI app state
-        self.backend_app.state.resource_request_queue = resource_request_queue
-        self.backend_app.state.resource_response_queue = resource_response_queue
+
+    def _run_file_watcher(self):
+        """Run the file watcher in a separate thread"""
+        data_dir = self.config.data_dir
+        if not data_dir.exists():
+            data_dir.mkdir(parents=True)
+            click.echo(f"📁 Created data directory: {data_dir}")
+
+        event_handler = DataDirectoryHandler(self.event_queue)
+        self.observer = Observer()
+        self.observer.schedule(event_handler, str(data_dir), recursive=True)
+        self.observer.start()
+        click.echo(f"👀 Watching for changes in {data_dir}")
+
+        try:
+            while not self.should_stop.is_set():
+                time.sleep(1)
+        finally:
+            if self.observer:
+                self.observer.stop()
+                self.observer.join()
+
+    def _cleanup_threads(self):
+        """Clean up thread resources"""
+        if self.observer:
+            self.observer.stop()
+            self.observer.join()
+        if self.watcher_thread and self.watcher_thread.is_alive():
+            self.watcher_thread.join(timeout=5)
 
     async def start_frontend(self):
         """Start the Next.js frontend server"""
@@ -105,13 +139,17 @@ class DevServer:
         # Create tasks for reading stdout and stderr
         await asyncio.gather(
             read_output(self.backend_process.stdout, "Backend"),
-            read_output(self.backend_process.stderr, "Backend Error"),
+            read_output(self.backend_process.stderr, "Backend"),
         )
 
-    async def start_async(self):
+    async def start_async(self, skip_init: bool):
         """Start both frontend and backend servers"""
         try:
             # Run both servers concurrently
+            self.watcher_thread = threading.Thread(
+                target=self._run_file_watcher, daemon=True
+            )
+            self.watcher_thread.start()
             await asyncio.gather(self.start_frontend(), self.start_backend())
         except Exception as e:
             click.echo(f"Error starting development servers: {str(e)}", err=True)
@@ -122,6 +160,8 @@ class DevServer:
         """Stop both frontend and backend servers"""
         click.echo("Stopping development servers...")
         try:
+            self.should_stop.set()
+            self._cleanup_threads()
             # Stop frontend
             if self.frontend_process:
                 click.echo("Stopping frontend server...")

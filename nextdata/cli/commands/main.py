@@ -1,9 +1,10 @@
 import importlib.resources
 from pathlib import Path
-import click
+import asyncclick as click
 import dotenv
 
-from nextdata.cli.commands import NDX_SINGLETON
+from .spark import spark
+from nextdata.cli.dev_server.main import DevServer
 
 from ..project_generator import NextDataGenerator
 from .pulumi import pulumi
@@ -20,6 +21,7 @@ def cli():
 
 cli.add_command(pulumi)
 cli.add_command(dev_server)
+cli.add_command(spark)
 
 
 @cli.command(name="create-ndx-app")
@@ -46,9 +48,10 @@ To get started:
 
 @cli.command(name="dev")
 @click.option("--skip-init", is_flag=True, help="Skip initialization of the stack")
-def dev(skip_init: bool):
+async def dev(skip_init: bool):
     """Start development server and watch for data changes"""
-    NDX_SINGLETON.start(skip_init=skip_init)
+    dev_server = DevServer()
+    await dev_server.start_async(skip_init=skip_init)
 
 
 @cli.command(name="list-templates")

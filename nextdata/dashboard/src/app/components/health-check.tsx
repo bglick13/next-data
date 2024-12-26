@@ -9,6 +9,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
 
 type HealthStatus = "healthy" | "unhealthy" | "unknown";
 
@@ -48,9 +49,15 @@ export function HealthCheckIndicator() {
   const overallStatus: HealthStatus = data?.status || "unknown";
 
   const statusIcon = {
-    healthy: <CheckCircle className="h-6 w-6 text-green-500" />,
-    unhealthy: <AlertCircle className="h-6 w-6 text-red-500" />,
-    unknown: <HelpCircle className="h-6 w-6 text-yellow-500" />,
+    healthy: (
+      <div className="h-2 w-2 rounded-full bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)] " />
+    ),
+    unhealthy: (
+      <div className="h-2 w-2 rounded-full bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)] " />
+    ),
+    unknown: (
+      <div className="h-2 w-2 rounded-full bg-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.5)] " />
+    ),
   };
 
   const statusText = {
@@ -62,12 +69,13 @@ export function HealthCheckIndicator() {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button
-          className="flex items-center space-x-2 rounded-full bg-white p-2 shadow-md hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+        <Button
           aria-label="Health Check Status"
+          variant="ghost"
+          className="p-2 hover:bg-transparent rounded-full"
         >
           {statusIcon[overallStatus]}
-        </button>
+        </Button>
       </PopoverTrigger>
       <PopoverContent className="w-80">
         <div className="grid gap-4">
