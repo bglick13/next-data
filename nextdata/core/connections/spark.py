@@ -4,6 +4,7 @@ from pyspark.sql import DataFrame, SparkSession
 
 from nextdata.cli.types import SparkSchemaSpec
 from nextdata.core.pulumi_context_manager import PulumiContextManager
+from nextdata.util.s3_tables_utils import get_s3_table_path
 
 
 class SparkManager:
@@ -57,22 +58,23 @@ class SparkManager:
         partition_keys: Optional[list[str]] = None,
     ) -> None:
         """Create a table"""
+        table_path = get_s3_table_path(self.namespace, table_name)
         if schema:
             logging.error(
                 f"Creating table {table_name} with schema {schema.model_dump_json()}"
             )
             self.spark.sql(
-                f"CREATE TABLE IF NOT EXISTS s3tablesbucket.{self.namespace}.{table_name} "
+                f"CREATE TABLE IF NOT EXISTS {table_path} "
                 f"({', '.join([f'{col} {dtype}' for col, dtype in schema.schema.items()])})"
             )
         else:
             self.spark.sql(
-                f"CREATE TABLE IF NOT EXISTS s3tablesbucket.{self.namespace}.{table_name} "
+                f"CREATE TABLE IF NOT EXISTS {table_path} "
                 f"({', '.join([f'{col} {dtype}' for col, dtype in df.dtypes])})"
             )
         if partition_keys:
             self.spark.sql(
-                f"ALTER TABLE s3tablesbucket.{self.namespace}.{table_name} SET PARTITION_BY ({', '.join(partition_keys)})"
+                f"ALTER TABLE {table_path} SET PARTITION_BY ({', '.join(partition_keys)})"
             )
 
     def write_to_table(
@@ -85,20 +87,20 @@ class SparkManager:
         """Write data to a table"""
         logging.error(f"Writing to table {table_name} in namespace {self.namespace}")
         logging.error(f"Sample data:\n{df.limit(10).show()}")
+        table_path = get_s3_table_path(self.namespace, table_name)
         self.create_table_from_df(table_name, df, schema)
-        df.write.mode(mode).saveAsTable(f"s3tablesbucket.{self.namespace}.{table_name}")
+        df.write.mode(mode).saveAsTable(table_path)
 
     def read_from_table(
         self, table_name: str, limit: int = 10, offset: int = 0
     ) -> DataFrame:
         """Read data from a table"""
+        table_path = get_s3_table_path(self.namespace, table_name)
         if limit:
             return self.spark.sql(
-                f"SELECT * FROM s3tablesbucket.{self.namespace}.{table_name} LIMIT {limit} OFFSET {offset}"
+                f"SELECT * FROM {table_path} LIMIT {limit} OFFSET {offset}"
             ).collect()
-        return self.spark.sql(
-            f"SELECT * FROM s3tablesbucket.{self.namespace}.{table_name}"
-        ).collect()
+        return self.spark.sql(f"SELECT * FROM {table_path}").collect()
 
     def read_from_csv(self, file_path: str) -> DataFrame:
         """Read data from a CSV file"""
@@ -106,13 +108,12 @@ class SparkManager:
 
     def get_table_metadata(self, table_name: str) -> dict:
         """Get table metadata"""
+        table_path = get_s3_table_path(self.namespace, table_name)
         try:
-            row_count = self.spark.sql(
-                f"SELECT COUNT(*) FROM s3tablesbucket.{self.namespace}.{table_name}"
-            ).collect()[0][0]
-            schema = self.spark.sql(
-                f"DESCRIBE s3tablesbucket.{self.namespace}.{table_name}"
-            ).collect()
+            row_count = self.spark.sql(f"SELECT COUNT(*) FROM {table_path}").collect()[
+                0
+            ][0]
+            schema = self.spark.sql(f"DESCRIBE {table_path}").collect()
             return {
                 "row_count": row_count,
                 "schema": schema,
@@ -125,4 +126,11 @@ class SparkManager:
 
     def get_table(self, table_name: str) -> DataFrame:
         """Get a table"""
-        return self.spark.table(f"s3tablesbucket.{self.namespace}.{table_name}")
+        table_path = get_s3_table_path(self.namespace, table_name)
+        return self.spark.table(table_path)
+
+    def delete_table(self, table_name: str) -> None:
+        """Delete a table"""
+        table_path = get_s3_table_path(self.namespace, table_name)
+        logging.error(f"Deleting table {table_path}")
+        self.spark.sql(f"DROP TABLE IF EXISTS {table_path} PURGE;")

@@ -14,6 +14,7 @@ class NextDataConfig(BaseModel):
     aws_secret_access_key: str = Field(default=None)
     project_dir: Path = Field(default_factory=lambda: Path.cwd())
     data_dir: Path = Field(default_factory=lambda: Path.cwd() / "data")
+    connections_dir: Path = Field(default_factory=lambda: Path.cwd() / "connections")
     stack_name: str = Field(default="dev")
 
     @classmethod
@@ -26,3 +27,9 @@ class NextDataConfig(BaseModel):
             aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
             stack_name=os.getenv("STACK_NAME", "dev"),
         )
+
+    def get_available_connections(self) -> list[str]:
+        return [f.name for f in self.connections_dir.iterdir() if f.is_dir()]
+
+    def get_available_tables(self) -> list[str]:
+        return [f.name for f in self.data_dir.iterdir() if f.is_dir()]

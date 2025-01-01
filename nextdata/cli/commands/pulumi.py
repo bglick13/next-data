@@ -1,5 +1,5 @@
 import json
-import click
+import asyncclick as click
 
 from nextdata.core.pulumi_context_manager import PulumiContextManager
 
@@ -35,6 +35,7 @@ def refresh():
 def destroy():
     """Pulumi destroy"""
     pulumi_context_manager = PulumiContextManager()
+    pulumi_context_manager.refresh_stack()
     pulumi_context_manager.destroy_stack()
 
 
