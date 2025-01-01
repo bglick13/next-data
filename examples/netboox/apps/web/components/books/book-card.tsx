@@ -1,10 +1,15 @@
-import { books } from "@workspace/db/src/schema.js";
+import {
+  getRandomUnreadBooks,
+  getUserRatings,
+} from "@workspace/db/src/queries";
 import { Card, CardContent } from "@workspace/ui/components/card";
 import { Star } from "lucide-react";
 import Link from "next/link";
 
 interface Props {
-  book: typeof books.$inferSelect;
+  book:
+    | Awaited<ReturnType<typeof getRandomUnreadBooks>>["data"][number]
+    | Awaited<ReturnType<typeof getUserRatings>>["data"][number];
   rating: number;
 }
 

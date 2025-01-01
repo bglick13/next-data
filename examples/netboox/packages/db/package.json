@@ -30,6 +30,7 @@
     "tsx": "^4.19.2"
   },
   "exports": {
-    "./src/*": "./src/*"
+    "./src/*": "./src/*",
+    "./src/queries": "./src/queries.ts"
   }
 }

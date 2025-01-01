@@ -4,17 +4,24 @@ import { InfiniteBooks } from "./infinite-books";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import { Card } from "@workspace/ui/components/card";
 
-import { books } from "@workspace/db/src/schema.js";
+import {
+  getRandomUnreadBooks,
+  getUserRatings,
+  searchBooks,
+} from "@workspace/db/src/queries";
 
 interface Props {
-  initialBooks: (typeof books.$inferSelect & {
-    rating: number;
-  })[];
+  initialBooks:
+    | Awaited<ReturnType<typeof getRandomUnreadBooks>>["data"]
+    | Awaited<ReturnType<typeof getUserRatings>>["data"]
+    | Awaited<ReturnType<typeof searchBooks>>["data"];
   hasMore: boolean;
-  fetchMore: (page: number) => Promise<
-    (typeof books.$inferSelect & {
-      rating: number;
-    })[]
+  fetchMore: (
+    page: number
+  ) => Promise<
+    | Awaited<ReturnType<typeof getRandomUnreadBooks>>
+    | Awaited<ReturnType<typeof getUserRatings>>
+    | Awaited<ReturnType<typeof searchBooks>>
   >;
 }
 

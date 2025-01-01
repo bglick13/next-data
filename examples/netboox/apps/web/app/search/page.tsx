@@ -1,4 +1,4 @@
-import { searchBooks } from "@portfolio/db/queries";
+import { searchBooks } from "@workspace/db/src/queries";
 import { Suspense } from "react";
 import { fetchMoreSearchResults } from "../actions";
 import { BooksGrid, BooksGridSkeleton } from "@/components/books/books-grid";
@@ -13,6 +13,8 @@ type PageProps = {
 async function SearchResults({ query }: { query: string }) {
   const { data: initialBooks, hasMore } = await searchBooks({
     query,
+    offset: 0,
+    limit: 12,
   });
 
   return (

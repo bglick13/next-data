@@ -2,17 +2,21 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BookCard } from "./book-card";
-import { books } from "@workspace/db/src/schema.js";
+import {
+  getRandomUnreadBooks,
+  getUserRatings,
+} from "@workspace/db/src/queries";
 
 interface Props {
-  initialBooks: (typeof books.$inferSelect & {
-    rating: number;
-  })[];
+  initialBooks:
+    | Awaited<ReturnType<typeof getRandomUnreadBooks>>["data"]
+    | Awaited<ReturnType<typeof getUserRatings>>["data"];
   hasMore: boolean;
-  fetchMore: (page: number) => Promise<
-    (typeof books.$inferSelect & {
-      rating: number;
-    })[]
+  fetchMore: (
+    page: number
+  ) => Promise<
+    | Awaited<ReturnType<typeof getRandomUnreadBooks>>
+    | Awaited<ReturnType<typeof getUserRatings>>
   >;
 }
 
@@ -39,9 +43,9 @@ export function InfiniteBooks({
 
     setIsLoading(true);
     try {
-      const newBooks = await fetchMore(page.current + 1);
-      if (newBooks.length > 0) {
-        setBooks((prev) => [...prev, ...newBooks]);
+      const { data, hasMore } = await fetchMore(page.current + 1);
+      if (data.length > 0) {
+        setBooks((prev) => [...prev, ...data]);
         page.current += 1;
       } else {
         setHasMore(false);
@@ -73,7 +77,7 @@ export function InfiniteBooks({
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
       {books.map((book) => (
-        <BookCard key={book.isbn} book={book} rating={book.rating} />
+        <BookCard key={book.isbn} book={book} rating={book.avg_rating} />
       ))}
       {hasMore && (
         <div

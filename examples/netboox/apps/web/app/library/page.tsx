@@ -1,4 +1,4 @@
-import { getUserRatings } from "@portfolio/db/queries";
+import { getUserRatings } from "@workspace/db/src/queries";
 import { Suspense } from "react";
 import { fetchMoreUserRatings } from "../actions";
 import { BooksGrid, BooksGridSkeleton } from "@/components/books/books-grid";
@@ -7,6 +7,8 @@ async function Books() {
   const testUserId = "189835";
   const { data: initialBooks, hasMore } = await getUserRatings({
     userId: testUserId,
+    offset: 0,
+    limit: 12,
   });
 
   return (

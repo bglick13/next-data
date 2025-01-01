@@ -1,32 +1,45 @@
-import { getBookDetails, getRandomUnreadBooks } from "@portfolio/db/queries";
+import {
+  getBookDetails,
+  getRandomUnreadBooks,
+} from "@workspace/db/src/queries";
 import { Star } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { BookmarkIcon, PlayIcon } from "lucide-react";
 
-interface Props {
-  params: {
-    isbn: string;
-  };
-}
+type Params = Promise<{
+  isbn: string;
+}>;
 
-export async function generateMetadata({ params }: Props) {
+export async function generateMetadata({ params }: { params: Params }) {
   const { isbn } = await params;
   const book = await getBookDetails(isbn);
+  if (!book) {
+    return {
+      title: "Book not found",
+    };
+  }
   return {
     title: `${book.book_title} by ${book.book_author}`,
   };
 }
 
 export async function generateStaticParams() {
-  const { data: books } = await getRandomUnreadBooks({ userId: "189835" });
+  const { data: books } = await getRandomUnreadBooks({
+    userId: "189835",
+    offset: 0,
+    limit: 12,
+  });
   return books.map((book) => ({
     isbn: book.isbn,
   }));
 }
 
-export default async function BookPage({ params }: Props) {
+export default async function BookPage({ params }: { params: Params }) {
   const { isbn } = await params;
   const book = await getBookDetails(isbn);
+  if (!book) {
+    return <div>Book not found</div>;
+  }
   return (
     <div className="relative min-h-screen bg-background w-full">
       {/* Hero Section */}
@@ -34,7 +47,7 @@ export default async function BookPage({ params }: Props) {
         {/* Background Image */}
         <div className="absolute inset-0">
           <img
-            src={book.image_url_l}
+            src={book.image_url_l ?? ""}
             alt={book.book_title}
             className="h-full w-full object-cover"
           />
@@ -48,7 +61,8 @@ export default async function BookPage({ params }: Props) {
             <div className="flex items-center">
               <Star className="w-5 h-5 fill-yellow-400 stroke-yellow-400" />
               <span className="ml-1 text-lg">
-                {book.averageRating.toFixed(1)} ({book.numRatings} ratings)
+                {book?.avg_rating?.toFixed(1) ?? "N/A"} (
+                {book?.num_ratings ?? "N/A"} ratings)
               </span>
             </div>
             <span className="text-lg">{book.year_of_publication}</span>
@@ -108,7 +122,7 @@ export default async function BookPage({ params }: Props) {
                 >
                   <div className="relative aspect-[2/3] overflow-hidden rounded-lg">
                     <img
-                      src={similarBook.image_url_l}
+                      src={similarBook.image_url_l ?? ""}
                       alt={similarBook.book_title}
                       className="h-full w-full object-cover transition-transform group-hover:scale-105"
                     />

@@ -1,8 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   transpilePackages: ["@workspace/ui"],
-  dynamicIO: true,
-
+  experimental: {
+    dynamicIO: true,
+  },
 }
 
 export default nextConfig
