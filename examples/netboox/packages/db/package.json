@@ -1,0 +1,35 @@
+{
+  "name": "@workspace/db",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "clean": "rm -rf .turbo node_modules",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "typecheck": "tsc --noEmit",
+    "dev": "drizzle-kit studio",
+    "generate": "drizzle-kit generate",
+    "migrate": "drizzle-kit migrate",
+    "push": "drizzle-kit push",
+    "seed": "drizzle-seed",
+    "check": "drizzle-kit check"
+  },
+  "dependencies": {
+    "@aws-sdk/dsql-signer": "^3.716.0",
+    "@vercel/functions": "^1.5.2",
+    "dotenv": "^16.4.7",
+    "drizzle-orm": "^0.38.3",
+    "drizzle-seed": "^0.3.0",
+    "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.11.10",
+    "@workspace/eslint-config": "workspace:*",
+    "@workspace/typescript-config": "workspace:*",
+    "drizzle-kit": "^0.30.1",
+    "tsx": "^4.19.2"
+  },
+  "exports": {
+    "./src/*": "./src/*"
+  }
+}
