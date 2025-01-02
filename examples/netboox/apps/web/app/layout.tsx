@@ -26,7 +26,7 @@ export default function RootLayout({
       >
         <Providers>
           <AppSidebar />
-          {children}
+          <main className="w-full">{children}</main>
           <Toaster />
         </Providers>
       </body>

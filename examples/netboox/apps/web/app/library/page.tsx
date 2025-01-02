@@ -17,6 +17,7 @@ async function Books() {
       initialBooks={initialBooks}
       hasMore={hasMore}
       fetchMore={fetchMoreUserRatings}
+      uiContext="library"
     />
   );
 }

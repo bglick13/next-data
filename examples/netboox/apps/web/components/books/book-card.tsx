@@ -1,19 +1,9 @@
-import {
-  getRandomUnreadBooks,
-  getUserRatings,
-} from "@workspace/db/src/queries";
 import { Card, CardContent } from "@workspace/ui/components/card";
 import { Star } from "lucide-react";
 import Link from "next/link";
+import { BookCardProps } from "./types";
 
-interface Props {
-  book:
-    | Awaited<ReturnType<typeof getRandomUnreadBooks>>["data"][number]
-    | Awaited<ReturnType<typeof getUserRatings>>["data"][number];
-  rating: number;
-}
-
-export function BookCard({ book, rating }: Props) {
+export function BookCard({ book }: BookCardProps) {
   return (
     <Link href={`/book/${book.isbn}`}>
       <Card className="overflow-hidden transition-all hover:scale-105 hover:shadow-xl">
@@ -32,7 +22,6 @@ export function BookCard({ book, rating }: Props) {
                 <p className="text-sm truncate">{book.book_author}</p>
                 <div className="flex items-center mt-1">
                   <Star className="w-4 h-4 fill-yellow-400 stroke-yellow-400 mr-1" />
-                  <span className="text-sm">{rating?.toFixed(1) ?? 0}</span>
                 </div>
               </div>
             </div>

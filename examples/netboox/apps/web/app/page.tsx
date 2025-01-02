@@ -2,9 +2,11 @@ import { Suspense } from "react";
 import { fetchMoreRandomBooks } from "./actions";
 import { BooksGrid, BooksGridSkeleton } from "@/components/books/books-grid";
 import { getRandomUnreadBooks } from "@workspace/db/src/queries";
+import { connection } from "next/server";
 
 async function Books() {
-  "use cache";
+  // "use cache";
+  await connection();
   const testUserId = 189835;
   const { data: initialBooks, hasMore } = await getRandomUnreadBooks({
     userId: testUserId,
@@ -17,6 +19,7 @@ async function Books() {
       initialBooks={initialBooks}
       hasMore={hasMore}
       fetchMore={fetchMoreRandomBooks}
+      uiContext="explore"
     />
   );
 }

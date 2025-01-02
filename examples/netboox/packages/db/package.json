@@ -7,12 +7,13 @@
     "lint": "biome check .",
     "format": "biome format --write .",
     "typecheck": "tsc --noEmit",
-    "dev": "drizzle-kit studio",
+    "dev": "PGPASSWORD=$(aws dsql generate-db-connect-admin-auth-token --region us-east-1 --expires-in 3600 --hostname ruabtw3kk6bprvlivzydznkjsu.dsql.us-east-1.on.aws) drizzle-kit studio --config=drizzle.dev.config.ts",
     "generate": "drizzle-kit generate",
     "migrate": "npx tsx migrate.ts",
     "push": "drizzle-kit push",
     "seed": "npx tsx seed.ts",
-    "check": "drizzle-kit check"
+    "check": "drizzle-kit check",
+    "get_db_token": "PGPASSWORD=$(aws dsql generate-db-connect-admin-auth-token --region us-east-1 --expires-in 3600 --hostname ruabtw3kk6bprvlivzydznkjsu.dsql.us-east-1.on.aws)"
   },
   "dependencies": {
     "@aws-sdk/dsql-signer": "^3.716.0",
@@ -21,7 +22,8 @@
     "dotenv": "^16.4.7",
     "drizzle-orm": "^0.38.3",
     "drizzle-seed": "^0.3.0",
-    "pg": "^8.13.1"
+    "pg": "^8.13.1",
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
     "@types/pg": "^8.11.10",

@@ -25,6 +25,7 @@ async function SearchResults({ query }: { query: string }) {
         "use server";
         return fetchMoreSearchResults(query, page);
       }}
+      uiContext="search"
     />
   );
 }

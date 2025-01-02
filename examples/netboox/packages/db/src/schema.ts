@@ -23,6 +23,7 @@ export const books = pgTable(
   (table) => [
     index("books_isbn_idx").on(table.isbn),
     index("books_book_title_idx").on(table.book_title),
+    index("books_book_author_idx").on(table.book_author),
   ]
 );
 

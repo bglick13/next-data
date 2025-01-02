@@ -1,6 +1,7 @@
 "use server";
 
 import {
+  getBookAverageRating,
   getRandomUnreadBooks,
   getUserRatings,
   searchBooks,
@@ -33,4 +34,9 @@ export async function fetchMoreSearchResults(query: string, page: number) {
     limit: 12,
   });
   return { data, hasMore };
+}
+
+export async function fetchBookAverageRating(isbn: string) {
+  const bookAverageRating = await getBookAverageRating(isbn);
+  return bookAverageRating;
 }

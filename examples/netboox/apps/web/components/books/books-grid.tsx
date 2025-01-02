@@ -1,29 +1,8 @@
-"use client";
-
 import { InfiniteBooks } from "./infinite-books";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import { Card } from "@workspace/ui/components/card";
 
-import {
-  getRandomUnreadBooks,
-  getUserRatings,
-  searchBooks,
-} from "@workspace/db/src/queries";
-
-interface Props {
-  initialBooks:
-    | Awaited<ReturnType<typeof getRandomUnreadBooks>>["data"]
-    | Awaited<ReturnType<typeof getUserRatings>>["data"]
-    | Awaited<ReturnType<typeof searchBooks>>["data"];
-  hasMore: boolean;
-  fetchMore: (
-    page: number
-  ) => Promise<
-    | Awaited<ReturnType<typeof getRandomUnreadBooks>>
-    | Awaited<ReturnType<typeof getUserRatings>>
-    | Awaited<ReturnType<typeof searchBooks>>
-  >;
-}
+import { Props } from "./types";
 
 export function BooksGrid(props: Props) {
   return <InfiniteBooks {...props} />;

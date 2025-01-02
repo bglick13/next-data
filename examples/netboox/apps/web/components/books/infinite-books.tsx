@@ -2,28 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BookCard } from "./book-card";
-import {
-  getRandomUnreadBooks,
-  getUserRatings,
-} from "@workspace/db/src/queries";
-
-interface Props {
-  initialBooks:
-    | Awaited<ReturnType<typeof getRandomUnreadBooks>>["data"]
-    | Awaited<ReturnType<typeof getUserRatings>>["data"];
-  hasMore: boolean;
-  fetchMore: (
-    page: number
-  ) => Promise<
-    | Awaited<ReturnType<typeof getRandomUnreadBooks>>
-    | Awaited<ReturnType<typeof getUserRatings>>
-  >;
-}
+import { Props } from "./types";
 
 export function InfiniteBooks({
   initialBooks,
   hasMore: initialHasMore,
   fetchMore,
+  uiContext,
 }: Props) {
   const [books, setBooks] = useState(initialBooks);
   const [hasMore, setHasMore] = useState(initialHasMore);
@@ -77,7 +62,7 @@ export function InfiniteBooks({
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
       {books.map((book) => (
-        <BookCard key={book.isbn} book={book} rating={book.avg_rating} />
+        <BookCard key={book.isbn} book={book} uiContext={uiContext} />
       ))}
       {hasMore && (
         <div
