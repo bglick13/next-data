@@ -32,7 +32,7 @@ export function BookCard({ book, rating }: Props) {
                 <p className="text-sm truncate">{book.book_author}</p>
                 <div className="flex items-center mt-1">
                   <Star className="w-4 h-4 fill-yellow-400 stroke-yellow-400 mr-1" />
-                  <span className="text-sm">{rating.toFixed(1)}</span>
+                  <span className="text-sm">{rating?.toFixed(1) ?? 0}</span>
                 </div>
               </div>
             </div>

@@ -1,13 +1,14 @@
 import { getConnection } from "./drizzle";
 import { books, ratings } from "./schema";
 import { and, eq, ilike, sql, desc, ne } from "drizzle-orm";
+import { performance } from "perf_hooks";
 
 export async function getRandomUnreadBooks({
   userId,
   offset,
   limit = 12,
 }: {
-  userId: string;
+  userId: number;
   offset: number;
   limit: number;
 }) {
@@ -52,7 +53,7 @@ export async function getUserRatings({
   offset,
   limit = 12,
 }: {
-  userId: string;
+  userId: number;
   offset: number;
   limit: number;
 }) {
@@ -68,7 +69,6 @@ export async function getUserRatings({
       image_url_m: books.image_url_m,
       image_url_l: books.image_url_l,
       avg_rating: ratings.book_rating,
-      num_ratings: sql<number>`count(${ratings.book_rating})::int`,
     })
     .from(ratings)
     .innerJoin(books, eq(books.isbn, ratings.isbn))
@@ -120,7 +120,10 @@ export async function searchBooks({
 }
 
 export async function getBookDetails(isbn: string) {
+  const startTime = performance.now();
   const db = await getConnection();
+  const getConnectionTime = performance.now() - startTime;
+  console.log(`getConnectionTime: ${getConnectionTime}ms`);
   const result = await db
     .select({
       isbn: books.isbn,
@@ -145,9 +148,12 @@ export async function getBookDetails(isbn: string) {
       books.image_url_m,
       books.image_url_l
     );
+  const getBookDetailsTime = performance.now() - startTime;
+  console.log(`getBookDetailsTime: ${getBookDetailsTime}ms`);
   if (result.length === 0) {
     return null;
   }
+  const startTime2 = performance.now();
   const similarBooks = await db
     .select({
       isbn: books.isbn,
@@ -164,5 +170,7 @@ export async function getBookDetails(isbn: string) {
       and(eq(books.book_author, result[0]!.book_author), ne(books.isbn, isbn))
     )
     .limit(4);
+  const getSimilarBooksTime = performance.now() - startTime2;
+  console.log(`getSimilarBooksTime: ${getSimilarBooksTime}ms`);
   return { ...result[0], similarBooks };
 }

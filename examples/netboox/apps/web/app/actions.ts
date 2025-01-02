@@ -7,8 +7,7 @@ import {
 } from "@workspace/db/src/queries";
 
 export async function fetchMoreRandomBooks(page: number) {
-  "use cache";
-  const testUserId = "189835";
+  const testUserId = 189835;
   const data = await getRandomUnreadBooks({
     userId: testUserId,
     offset: (page - 1) * 12,
@@ -18,8 +17,7 @@ export async function fetchMoreRandomBooks(page: number) {
 }
 
 export async function fetchMoreUserRatings(page: number) {
-  "use cache";
-  const testUserId = "189835";
+  const testUserId = 189835;
   const { data, hasMore } = await getUserRatings({
     userId: testUserId,
     offset: (page - 1) * 12,

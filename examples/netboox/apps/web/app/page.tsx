@@ -4,7 +4,8 @@ import { BooksGrid, BooksGridSkeleton } from "@/components/books/books-grid";
 import { getRandomUnreadBooks } from "@workspace/db/src/queries";
 
 async function Books() {
-  const testUserId = "189835";
+  "use cache";
+  const testUserId = 189835;
   const { data: initialBooks, hasMore } = await getRandomUnreadBooks({
     userId: testUserId,
     offset: 0,

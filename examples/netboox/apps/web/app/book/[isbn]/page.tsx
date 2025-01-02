@@ -1,7 +1,4 @@
-import {
-  getBookDetails,
-  getRandomUnreadBooks,
-} from "@workspace/db/src/queries";
+import { getBookDetails } from "@workspace/db/src/queries";
 import { Star } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { BookmarkIcon, PlayIcon } from "lucide-react";
@@ -10,31 +7,32 @@ type Params = Promise<{
   isbn: string;
 }>;
 
-export async function generateMetadata({ params }: { params: Params }) {
-  const { isbn } = await params;
-  const book = await getBookDetails(isbn);
-  if (!book) {
-    return {
-      title: "Book not found",
-    };
-  }
-  return {
-    title: `${book.book_title} by ${book.book_author}`,
-  };
-}
+// export async function generateMetadata({ params }: { params: Params }) {
+//   const { isbn } = await params;
+//   const book = await getBookDetails(isbn);
+//   if (!book) {
+//     return {
+//       title: "Book not found",
+//     };
+//   }
+//   return {
+//     title: `${book.book_title} by ${book.book_author}`,
+//   };
+// }
 
-export async function generateStaticParams() {
-  const { data: books } = await getRandomUnreadBooks({
-    userId: "189835",
-    offset: 0,
-    limit: 12,
-  });
-  return books.map((book) => ({
-    isbn: book.isbn,
-  }));
-}
+// export async function generateStaticParams() {
+//   const { data: books } = await getRandomUnreadBooks({
+//     userId: 189835,
+//     offset: 0,
+//     limit: 12,
+//   });
+//   return books.map((book) => ({
+//     isbn: book.isbn,
+//   }));
+// }
 
 export default async function BookPage({ params }: { params: Params }) {
+  // "use cache";
   const { isbn } = await params;
   const book = await getBookDetails(isbn);
   if (!book) {

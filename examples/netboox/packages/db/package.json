@@ -9,14 +9,15 @@
     "typecheck": "tsc --noEmit",
     "dev": "drizzle-kit studio",
     "generate": "drizzle-kit generate",
-    "migrate": "drizzle-kit migrate",
+    "migrate": "npx tsx migrate.ts",
     "push": "drizzle-kit push",
-    "seed": "drizzle-seed",
+    "seed": "npx tsx seed.ts",
     "check": "drizzle-kit check"
   },
   "dependencies": {
     "@aws-sdk/dsql-signer": "^3.716.0",
     "@vercel/functions": "^1.5.2",
+    "csv-parser": "^3.1.0",
     "dotenv": "^16.4.7",
     "drizzle-orm": "^0.38.3",
     "drizzle-seed": "^0.3.0",

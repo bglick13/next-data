@@ -17,14 +17,21 @@ export async function getToken() {
   if (cachedToken && cachedToken.expiresAt > now) {
     return cachedToken.token;
   }
-
-  const signer = new DsqlSigner({
-    hostname: process.env.DB_CLUSTER_ENDPOINT!,
-    region: "us-east-1",
-    credentials: awsCredentialsProvider({
-      roleArn: process.env.AWS_ROLE_ARN!,
-    }),
-  });
+  let signer: DsqlSigner;
+  if (process.env.NODE_ENV === undefined) {
+    signer = new DsqlSigner({
+      hostname: process.env.DB_CLUSTER_ENDPOINT!,
+      region: "us-east-1",
+    });
+  } else {
+    signer = new DsqlSigner({
+      hostname: process.env.DB_CLUSTER_ENDPOINT!,
+      region: "us-east-1",
+      credentials: awsCredentialsProvider({
+        roleArn: process.env.AWS_ROLE_ARN!,
+      }),
+    });
+  }
 
   const token = await signer.getDbConnectAdminAuthToken();
 

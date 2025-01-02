@@ -1,3 +1,9 @@
+# Repro notes
+
+- Make sure the Vercel OIDC IAM role has the necessary DSQL policies
+- There's a bug in the PG migrate code that causes a type error with the `serial` type, even when not using serial columns
+  - Fix is to generate the migration files and manually run them in psql`
+
 # shadcn/ui monorepo template
 
 This template is for creating a monorepo with shadcn/ui.
@@ -27,5 +33,5 @@ Your `tailwind.config.ts` and `globals.css` are already set up to use the compon
 To use the components in your app, import them from the `ui` package.
 
 ```tsx
-import { Button } from "@workspace/ui/components/ui/button"
+import { Button } from "@workspace/ui/components/ui/button";
 ```

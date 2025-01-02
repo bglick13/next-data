@@ -2,9 +2,10 @@ import { getUserRatings } from "@workspace/db/src/queries";
 import { Suspense } from "react";
 import { fetchMoreUserRatings } from "../actions";
 import { BooksGrid, BooksGridSkeleton } from "@/components/books/books-grid";
-
+import { connection } from "next/server";
 async function Books() {
-  const testUserId = "189835";
+  await connection();
+  const testUserId = 189835;
   const { data: initialBooks, hasMore } = await getUserRatings({
     userId: testUserId,
     offset: 0,
