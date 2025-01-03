@@ -8,24 +8,26 @@ import { searchQueryParsers } from "./searchParams";
 
 export function SearchInput() {
   const [{ q }, setQuery] = useQueryStates(searchQueryParsers);
-  const [value, setValue] = useState(q ?? "");
+  const [value, setValue] = useState<string | null>(q);
   const debouncedValue = useDebounce(value, 300);
 
   useEffect(() => {
-    setQuery(
-      { q: debouncedValue || null },
-      {
-        history: "push",
-        shallow: false,
-      }
-    );
-  }, [debouncedValue, setQuery]);
+    if (debouncedValue !== q) {
+      setQuery(
+        { q: debouncedValue || null },
+        {
+          history: "push",
+          shallow: false,
+        }
+      );
+    }
+  }, [debouncedValue, setQuery, q]);
 
   return (
     <Input
       type="search"
       placeholder="Search by title..."
-      value={value}
+      value={value ?? ""}
       onChange={(e) => setValue(e.target.value)}
       className="w-full"
     />

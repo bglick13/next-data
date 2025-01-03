@@ -136,23 +136,12 @@ export async function searchBooks({
       image_url_s: books.image_url_s,
       image_url_m: books.image_url_m,
       image_url_l: books.image_url_l,
-      avg_rating: sql<number>`avg(${ratings.book_rating})::float`,
-      num_ratings: sql<number>`count(${ratings.book_rating})::int`,
     })
     .from(books)
-    .leftJoin(ratings, eq(books.isbn, ratings.isbn))
     .where(query ? ilike(books.book_title, `%${query}%`) : undefined)
-    .groupBy(
-      books.isbn,
-      books.book_title,
-      books.book_author,
-      books.image_url_s,
-      books.image_url_m,
-      books.image_url_l
-    )
-    .orderBy(desc(ratings.book_rating))
-    .limit(limit + 1)
-    .offset(offset);
+    // .where(query ? ilike(books.book_title_truncated, `%${query}%`) : undefined)
+    .offset(offset)
+    .limit(limit + 1);
   if (IS_DEV) {
     await explainQuery(db, dbQuery, "searchBooks");
   }

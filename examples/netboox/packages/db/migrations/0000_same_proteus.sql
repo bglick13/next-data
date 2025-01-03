@@ -1,6 +1,7 @@
 CREATE TABLE "books" (
 	"isbn" text PRIMARY KEY NOT NULL,
 	"book_title" text NOT NULL,
+	"book_title_truncated" text NOT NULL,
 	"book_author" text DEFAULT '' NOT NULL,
 	"year_of_publication" integer,
 	"publisher" text DEFAULT '' NOT NULL,
@@ -27,9 +28,9 @@ CREATE TABLE "users" (
 --> statement-breakpoint
 -- Book indexes
 CREATE INDEX "books_isbn_idx" ON books(isbn);--> statement-breakpoint
-CREATE INDEX "books_book_title_idx" ON books(book_title);--> statement-breakpoint
+CREATE INDEX "books_book_title_idx" ON books(book_title_truncated);--> statement-breakpoint
 CREATE INDEX "books_book_author_idx" ON books(book_author);--> statement-breakpoint
-CREATE INDEX idx_books_details ON books (isbn, book_title, book_author, year_of_publication, publisher, image_url_s, image_url_m, image_url_l);
+CREATE INDEX idx_books_details ON books (isbn, book_title_truncated, book_author, year_of_publication, publisher, image_url_s, image_url_m, image_url_l);
 -- Rating indexes
 CREATE INDEX "ratings_user_id_idx" ON ratings(user_id);--> statement-breakpoint
 CREATE INDEX "ratings_isbn_idx" ON ratings(isbn);--> statement-breakpoint

@@ -12,6 +12,7 @@ export const books = pgTable(
   {
     isbn: text("isbn").primaryKey(),
     book_title: text("book_title").notNull(),
+    book_title_truncated: text("book_title_truncated").notNull(),
     book_author: text("book_author").notNull().default(""),
     year_of_publication: integer("year_of_publication"),
     publisher: text("publisher").notNull().default(""),

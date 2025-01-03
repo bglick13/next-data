@@ -21,6 +21,10 @@ async function parseBooksFromCSV(): Promise<(typeof books.$inferInsert)[]> {
           booksToInsert.push({
             isbn: row.isbn,
             book_title: row.book_title,
+            book_title_truncated:
+              row.book_title.length > 200
+                ? row.book_title.substring(0, 200)
+                : row.book_title,
             book_author: row.book_author,
             year_of_publication: row.year_of_publication,
             publisher: row.publisher,
