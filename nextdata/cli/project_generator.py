@@ -72,6 +72,9 @@ class NextDataGenerator:
                     extra_context=context,
                     output_dir=".",
                 )
+            # Add .env file to .gitignore
+            with open(self.app_dir / ".gitignore", "a") as f:
+                f.write("\n.env\n")
         except Exception as e:
             click.echo(f"Error generating project: {str(e)}")
             raise click.ClickException("Failed to generate project")

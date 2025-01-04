@@ -3,6 +3,7 @@ nextdata/templates/default/venv
 *.pyc
 **__pycache__
 __pycache__/
-**.env
+.env
+!nextdata/templates/default/{{cookiecutter.project_slug}}/.env
 **.DS_Store
 **.csv
