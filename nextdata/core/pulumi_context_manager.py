@@ -220,7 +220,7 @@ class PulumiContextManager:
         role_policy_attachment_lakeformation_admin = aws.iam.RolePolicyAttachment(
             "role-policy-attachment-lakeformation-admin",
             role=glue_role.name,
-            policy_arn="arn:aws:iam::aws:policy/service-role/AWSLakeFormationDataAdmin",
+            policy_arn="arn:aws:iam::aws:policy/AWSLakeFormationDataAdmin",
         )
         self._iam_role = glue_role
         self._iam_role_policy_attachment_s3 = role_policy_attachment_s3
@@ -255,30 +255,54 @@ class PulumiContextManager:
         glue_catalog_database = aws.glue.CatalogDatabase(
             "glue-catalog-database",
             name=f"{self.config.project_slug}database",
-            target_database=aws.glue.CatalogDatabaseTargetDatabaseArgs(
-                catalog_id=f"{self.table_bucket.owner_account_id}:s3tablescatalog/{self.table_bucket.name}",
-                database_name=self.table_namespace.namespace.apply(
-                    lambda ns: ns.replace("-", "_")
-                ),
-            ),
-            create_table_default_permissions=[],
+            catalog_id=self.table_bucket.owner_account_id,
         )
         # Create a bucket for Glue jobs
         glue_job_bucket = aws.s3.BucketV2(
             "glue-job-bucket",
             force_destroy=True,
         )
+        # Add bucket policy to allow Glue to access scripts
+        glue_job_bucket_policy = aws.s3.BucketPolicy(
+            "glue-job-bucket-policy",
+            bucket=glue_job_bucket.id,
+            policy=pulumi.Output.all(bucket=glue_job_bucket.id).apply(
+                lambda args: json.dumps(
+                    {
+                        "Version": "2012-10-17",
+                        "Statement": [
+                            {
+                                "Sid": "AllowGlueAccess",
+                                "Effect": "Allow",
+                                "Principal": {"Service": "glue.amazonaws.com"},
+                                "Action": [
+                                    "s3:GetObject",
+                                    "s3:PutObject",
+                                    "s3:DeleteObject",
+                                ],
+                                "Resource": [
+                                    f"arn:aws:s3:::{args['bucket']}/*",
+                                    f"arn:aws:s3:::{args['bucket']}",
+                                ],
+                            }
+                        ],
+                    }
+                )
+            ),
+        )
         # Upload a Glue job script.
         # default_etl_script.py is a package module in the ndx-etl package
         glue_etl_job_script = aws.s3.BucketObject(
             "glue-etl-job-script.py",
             bucket=glue_job_bucket.id,
+            key="scripts/default_etl_script.py",
             source=pulumi.asset.FileAsset(
                 importlib.resources.files("nextdata")
                 / "core"
                 / "glue"
                 / "default_etl_script.py"
             ),
+            opts=pulumi.ResourceOptions(depends_on=[glue_job_bucket]),
         )
         self._glue_catalog_database = glue_catalog_database
         self._glue_job_bucket = glue_job_bucket
@@ -334,46 +358,115 @@ class PulumiContextManager:
 
     def _setup_lakeformation(self):
         """Grant lakeformation permissions to the principal so analytics integration works"""
-        # Set up the data lake admin
-        lakeformation_settings = aws.lakeformation.DataLakeSettings(
-            "lakeformation-settings",
-            admins=[self.iam_role.arn],
+        # 1. Create Lake Formation service role
+        lake_formation_service_role = aws.iam.Role(
+            "lake-formation-service-role",
+            assume_role_policy=json.dumps(
+                {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {"Service": "lakeformation.amazonaws.com"},
+                            "Action": "sts:AssumeRole",
+                        }
+                    ],
+                }
+            ),
         )
 
-        # Grant table permissions for each table
-        for table_name, table in self._tables.items():
+        # 2. Register resources with Lake Formation
+        lake_formation_resource = aws.lakeformation.Resource(
+            "table-bucket-registration",
+            role_arn=lake_formation_service_role.arn,
+            arn=self.table_bucket.arn,
+            use_service_linked_role=True,
+        )
+
+        # 3. Grant Lake Formation permissions for existing Glue database
+        database_permissions = aws.lakeformation.Permissions(
+            "lakeformation-database-permissions",
+            principal=lake_formation_service_role.arn,
+            database=aws.lakeformation.PermissionsDatabaseArgs(
+                name=self.glue_catalog_database.name,
+                catalog_id=self.table_bucket.owner_account_id,
+            ),
+            permissions=["ALL"],
+            opts=pulumi.ResourceOptions(depends_on=[self.glue_catalog_database]),
+        )
+
+        # 4. Grant table permissions for each table
+        for table_path in self.config.get_available_tables():
+            table_name = Path(table_path).name
             table_permissions = aws.lakeformation.Permissions(
                 f"lakeformation-permissions-{table_name}",
-                principal=self.iam_role.arn,
+                principal=lake_formation_service_role.arn,
                 table=aws.lakeformation.PermissionsTableArgs(
-                    database_name=self._table_namespace.namespace,
+                    database_name=self.glue_catalog_database.name,
                     name=table_name,
-                    catalog_id=pulumi.Output.concat(
-                        self.table_bucket.owner_account_id,
-                        ":s3tablescatalog/",
-                        self.table_bucket.name,
-                    ),
+                    catalog_id=self.table_bucket.owner_account_id,
                 ),
                 permissions=["ALL"],
-                opts=pulumi.ResourceOptions(depends_on=[lakeformation_settings]),
+                opts=pulumi.ResourceOptions(depends_on=[self.glue_catalog_database]),
             )
+
+        # # Grant table permissions for each table
+        # for table_name, table in self._tables.items():
+        #     table_permissions = aws.lakeformation.Permissions(
+        #         f"lakeformation-permissions-{table_name}",
+        #         principal=self.iam_role.arn,
+        #         table=aws.lakeformation.PermissionsTableArgs(
+        #             database_name=self._table_namespace.namespace,
+        #             name=table_name,
+        #             catalog_id=self.table_bucket.owner_account_id,
+        #         ),
+        #         permissions=["ALL"],
+        #         opts=pulumi.ResourceOptions(depends_on=[lakeformation_settings]),
+        #     )
+
+    def _get_glue_job_bucket_name(self):
+        return pulumi.Output.all(bucket=self.glue_job_bucket.bucket).apply(
+            lambda args: args["bucket"]
+        )
 
     def _setup_glue_job(self, table_path: Path, job_type: Literal["etl", "retl"]):
         """Setup a glue job for a table"""
         # Check if there's a custom etl script for this table by looking for an etl.py file with a @glue_job decorator
+        bucket_name = self.glue_job_bucket.bucket
+        table_namespace = self.table_namespace.namespace
 
         if has_custom_glue_job(table_path / f"{job_type}.py"):
-            etl_script_path = table_path / f"{job_type}.py"
-            aws.s3.BucketObject(
+            script_key = f"scripts/{table_path.name}/{job_type}.py"
+            custom_script = aws.s3.BucketObject(
                 f"glue-etl-job-script-{table_path.name}.py",
-                aws.s3.BucketObjectArgs(
-                    bucket=self.glue_job_bucket.id,
-                    source=pulumi.asset.FileAsset(etl_script_path),
-                ),
+                bucket=self.glue_job_bucket.id,
+                key=script_key,
+                source=pulumi.asset.FileAsset(table_path / f"{job_type}.py"),
+                opts=pulumi.ResourceOptions(depends_on=[self.glue_job_bucket]),
             )
-            script_location = f"s3://{self.glue_job_bucket.bucket.apply(lambda name: name)}/{table_path.name}"
         else:
-            script_location = "default_etl_script.py"
+            script_key = "scripts/default_etl_script.py"
+
+        # Create script_location using Output.concat
+        script_location = pulumi.Output.concat(
+            "s3://",
+            bucket_name,
+            "/",
+            script_key,
+        )
+        temp_dir = pulumi.Output.concat(
+            "s3://",
+            bucket_name,
+            "/",
+            "glue-job-temp/",
+        )
+        job_name = pulumi.Output.concat(
+            self.config.project_slug,
+            "-",
+            table_path.name,
+            "-",
+            job_type,
+        )
 
         # Get the connection name from the etl.py file by checking connection_name variable
         connection_name = get_connection_name(table_path / f"{job_type}.py")
@@ -382,51 +475,82 @@ class PulumiContextManager:
             or connection_name not in self.config.get_available_connections()
         ):
             raise ValueError(
-                f"No connection name found in {etl_script_path}. Please add a connection_name variable and ensure it's defined in the connections directory."
+                f"No connection name found in {script_key}. Please add a connection_name variable and ensure it's defined in the connections directory."
             )
         connection_args = get_connection_args(
             connection_name, self.config.connections_dir
         )
         print(f"Connection args: {connection_args}")
+        # Export values for debugging
+        pulumi.export("Glue Job Bucket", self._get_glue_job_bucket_name())
+        pulumi.export("Script Key", script_key)
+        # Export script_location using Output.concat
+        pulumi.export(
+            "Script location",
+            pulumi.Output.concat(
+                "s3://", self._get_glue_job_bucket_name(), "/", script_key
+            ),
+        )
         incremental_column = get_incremental_column(table_path / f"{job_type}.py")
         glue_job = aws.glue.Job(
             f"glue-job-{table_path.name}",
             name=f"{self.config.project_slug}-{table_path.name}-{job_type}",
             role_arn=self.iam_role.arn,
-            glue_version="3.0",
-            connections=[connection_name],
-            number_of_workers=1,
+            glue_version="4.0",
+            # connections=[connection_name],
+            number_of_workers=2,
             worker_type="G.1X",
             timeout=3600,
             max_retries=0,
-            default_arguments={
-                "--JOB_NAME": self.glue_job_bucket.bucket.apply(
-                    lambda name: f"{name}-{table_path.name}-{job_type}"
-                ),
-                "--JobType": "GLUE_ETL",
-                "--ConnectionName": connection_name,
-                "--ConnectionType": connection_args.connection_type,
-                "--ConnectionProperties": json.dumps(connection_args.model_dump()),
-                "--GlueDBName": self.glue_catalog_database.name,
-                "--TempDir": self.glue_job_bucket.bucket.apply(
-                    lambda name: f"s3://{name}/glue-job-temp/"
-                ),
-                "--SQLTable": table_path.name,
-                "--OutputS3Path": get_s3_table_path(
-                    self._table_namespace.namespace.apply(
-                        lambda ns: ns.replace("-", "_")
+            default_arguments=pulumi.Output.all(
+                bucket=bucket_name, namespace=table_namespace
+            ).apply(
+                lambda args: {
+                    "--JOB_NAME": f"{self.config.project_slug}-{table_path.name}-{job_type}",
+                    "--JobType": "GLUE_ETL",
+                    "--ConnectionName": connection_name,
+                    "--ConnectionType": connection_args.connection_type,
+                    "--ConnectionProperties": json.dumps(connection_args.model_dump()),
+                    "--GlueDBName": self.glue_catalog_database.name,
+                    "--SQLTable": table_path.name,
+                    "--SQLQuery": "",
+                    "--OutputS3Path": pulumi.Output.concat(
+                        "s3tablesbucket.", args["namespace"], ".", table_path.name
                     ),
-                    table_path,
-                ),
-                "--IncrementalColumn": incremental_column,
-                "--IsFullLoad": "false",
-                "--job-bookmarks-option": "job-bookmark-enable",
-            },
+                    "--IncrementalColumn": incremental_column,
+                    "--IsFullLoad": "false",
+                    "--JobLanguage": "python",
+                    "--enable-continuous-cloudwatch-log": "true",
+                    "--enable-metrics": "true",
+                    "--enable-spark-ui": "true",
+                    "--spark-event-logs-path": pulumi.Output.concat(
+                        "s3://", args["bucket"], "/spark-logs/"
+                    ),
+                    "--enable-job-insights": "true",
+                    "--job-bookmark-option": "job-bookmark-enable",
+                    "--TempDir": pulumi.Output.concat(
+                        "s3://", args["bucket"], "/temporary/"
+                    ),
+                    "--enable-glue-datacatalog": "true",
+                    "--conf": "spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions --conf spark.sql.catalog.glue_catalog=org.apache.iceberg.spark.SparkCatalog --conf spark.sql.catalog.glue_catalog.warehouse=s3://",
+                    "--additional-python-modules": "nextdata==0.1.5 boto3==1.26.137",
+                    "--datalake-formats": "iceberg",
+                }
+            ),
             command=aws.glue.JobCommandArgs(
                 name="glue-etl-job-script",
-                script_location=self.glue_etl_job_script.bucket.apply(
-                    lambda name: f"s3://{name}/{script_location}"
-                ),
+                python_version="3",
+                script_location=script_location,
+            ),
+            opts=pulumi.ResourceOptions(
+                depends_on=[
+                    self._glue_etl_job_script,
+                    (
+                        custom_script
+                        if has_custom_glue_job(table_path / f"{job_type}.py")
+                        else self._glue_etl_job_script
+                    ),
+                ]
             ),
         )
 
@@ -444,7 +568,7 @@ class PulumiContextManager:
         self._ensure_base_resources()
         self._ensure_existing_tables()
         self._setup_glue()
-        self._setup_lakeformation()
+        # self._setup_lakeformation()
         self._discover_etl_scripts()
 
     def create_stack(self):

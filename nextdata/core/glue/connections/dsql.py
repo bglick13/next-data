@@ -29,14 +29,19 @@ class DSQLGlueJobArgs(JDBCGlueJobArgs):
     required_iam_policies: dict[str, str] = {
         "dsqlconnect": json.dumps(
             {
-                "Action": [
-                    "dsql:ListClusters",
-                    "dsql:DbConnect",
-                    "dsql:ListTagsForResource",
-                    "dsql:GetCluster",
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Action": [
+                            "dsql:ListClusters",
+                            "dsql:DbConnect",
+                            "dsql:ListTagsForResource",
+                            "dsql:GetCluster",
+                        ],
+                        "Effect": "Allow",
+                        "Resource": ["*"],
+                    }
                 ],
-                "Effect": "Allow",
-                "Resource": ["*"],
             }
         )
     }

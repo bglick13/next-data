@@ -3,6 +3,8 @@ from pathlib import Path
 import asyncclick as click
 import dotenv
 
+from nextdata.cli.dashboard_installer import DashboardInstaller
+
 from .spark import spark
 from nextdata.cli.dev_server.main import DevServer
 
@@ -48,10 +50,18 @@ To get started:
 
 @cli.command(name="dev")
 @click.option("--skip-init", is_flag=True, help="Skip initialization of the stack")
-async def dev(skip_init: bool):
+@click.option(
+    "--dashboard-port", type=int, default=3000, help="Port to run the dashboard on"
+)
+@click.option("--api-port", type=int, default=8000, help="Port to run the API on")
+async def dev(skip_init: bool, dashboard_port: int, api_port: int):
     """Start development server and watch for data changes"""
+    dashboard_installer = DashboardInstaller()
+    dashboard_installer.install()
     dev_server = DevServer()
-    await dev_server.start_async(skip_init=skip_init)
+    await dev_server.start_async(
+        skip_init=skip_init, dashboard_port=dashboard_port, api_port=api_port
+    )
 
 
 @cli.command(name="list-templates")

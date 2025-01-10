@@ -57,7 +57,10 @@ class NextDataGenerator:
         # Create context for cookiecutter
         context = {
             "project_name": self.final_app_name,
-            "project_slug": self.final_app_name.lower().replace(" ", "_"),
+            "project_slug": self.final_app_name.lower()
+            .replace(" ", "")
+            .replace("-", "")
+            .replace("_", ""),
         }
 
         click.echo(f"Using template directory: {self.template_dir}")

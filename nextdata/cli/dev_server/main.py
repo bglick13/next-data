@@ -57,7 +57,7 @@ class DevServer:
         if self.watcher_thread and self.watcher_thread.is_alive():
             self.watcher_thread.join(timeout=5)
 
-    async def start_frontend(self):
+    async def start_frontend(self, dashboard_port: int):
         """Start the Next.js frontend server"""
         try:
             click.echo(f"Starting dashboard from: {self.dashboard_path}")
@@ -76,11 +76,15 @@ class DevServer:
                 await proc.wait()
 
             # Start the dev server
-            click.echo("Starting Next.js development server...")
+            click.echo(
+                f"Starting Next.js development server on port {dashboard_port}..."
+            )
             self.frontend_process = await asyncio.create_subprocess_exec(
                 "pnpm",
                 "run",
                 "dev",
+                "--port",
+                str(dashboard_port),
                 cwd=self.dashboard_path,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
@@ -104,7 +108,7 @@ class DevServer:
             click.echo(f"Error starting frontend server: {str(e)}", err=True)
             raise
 
-    async def start_backend(self):
+    async def start_backend(self, api_port: int):
         """Start the FastAPI backend server"""
         click.echo(f"Starting backend from: {self.backend_path}")
         # Get the parent directory of backend_path to watch the whole cli module
@@ -120,7 +124,7 @@ class DevServer:
             "--host",
             "127.0.0.1",
             "--port",
-            "8000",
+            str(api_port),
             "--reload",
             "--reload-dir",
             watch_dir,
@@ -142,7 +146,7 @@ class DevServer:
             read_output(self.backend_process.stderr, "Backend"),
         )
 
-    async def start_async(self, skip_init: bool):
+    async def start_async(self, skip_init: bool, dashboard_port: int, api_port: int):
         """Start both frontend and backend servers"""
         try:
             # Run both servers concurrently
@@ -150,7 +154,9 @@ class DevServer:
                 target=self._run_file_watcher, daemon=True
             )
             self.watcher_thread.start()
-            await asyncio.gather(self.start_frontend(), self.start_backend())
+            await asyncio.gather(
+                self.start_frontend(dashboard_port), self.start_backend(api_port)
+            )
         except Exception as e:
             click.echo(f"Error starting development servers: {str(e)}", err=True)
             await self.stop_async()
