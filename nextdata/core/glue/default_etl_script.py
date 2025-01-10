@@ -145,8 +145,8 @@ def main(
         connection_args: dict[str, Any] = job_args.connection_properties
         connection_conf = DSQLGlueJobArgs(host=connection_args["host"])
         password = generate_dsql_password(connection_conf.host)
-    elif job_args.connection_type == "jdbc":
-        connection_conf = JDBCGlueJobArgs(**job_args.connection_properties)
+    elif job_args.ConnectionType == "jdbc":
+        connection_conf = JDBCGlueJobArgs(**job_args.ConnectionProperties)
         password = connection_conf.password
     else:
         raise ValueError(f"Unsupported connection type: {job_args.connection_type}")
