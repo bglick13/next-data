@@ -11,6 +11,7 @@ from nextdata.cli.dev_server.main import DevServer
 from ..project_generator import NextDataGenerator
 from .pulumi import pulumi
 from .dev_server import dev_server
+from .aws import aws
 
 dotenv.load_dotenv(Path.cwd() / ".env")
 
@@ -24,6 +25,7 @@ def cli():
 cli.add_command(pulumi)
 cli.add_command(dev_server)
 cli.add_command(spark)
+cli.add_command(aws)
 
 
 @cli.command(name="create-ndx-app")

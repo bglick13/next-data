@@ -8,8 +8,15 @@ from nextdata.util.s3_tables_utils import get_s3_table_path
 
 
 class SparkManager:
-    def __init__(self):
-        self.bucket_arn, self.namespace = PulumiContextManager.get_connection_info()
+    def __init__(
+        self,
+        bucket_arn: Optional[str] = None,
+        namespace: Optional[str] = None,
+    ):
+        if not bucket_arn or not namespace:
+            bucket_arn, namespace = PulumiContextManager.get_connection_info()
+        self.bucket_arn = bucket_arn
+        self.namespace = namespace
         self.spark = self.create_spark_session()
 
     def create_spark_session(self) -> SparkSession:
@@ -66,11 +73,13 @@ class SparkManager:
             self.spark.sql(
                 f"CREATE TABLE IF NOT EXISTS {table_path} "
                 f"({', '.join([f'{col} {dtype}' for col, dtype in schema.schema.items()])})"
+                f"USING iceberg"
             )
         else:
             self.spark.sql(
                 f"CREATE TABLE IF NOT EXISTS {table_path} "
                 f"({', '.join([f'{col} {dtype}' for col, dtype in df.dtypes])})"
+                f"USING iceberg"
             )
         if partition_keys:
             self.spark.sql(

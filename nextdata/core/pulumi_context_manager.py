@@ -10,16 +10,13 @@ from nextdata.cli.types import StackOutputs
 import importlib.util
 import importlib.resources
 
-from nextdata.core.glue.connections.generic_connection import (
-    GenericConnectionGlueJobArgs,
-)
+
 from nextdata.util.framework_magic import (
     get_connection_args,
     get_connection_name,
     get_incremental_column,
     has_custom_glue_job,
 )
-from nextdata.util.s3_tables_utils import get_s3_table_path
 
 from .project_config import NextDataConfig
 
@@ -195,6 +192,33 @@ class PulumiContextManager:
                     ],
                 }
             ),
+        )
+        # Add CloudWatch Logs permissions
+        cloudwatch_policy = aws.iam.Policy(
+            "cloudwatch-policy",
+            policy=json.dumps(
+                {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "logs:CreateLogGroup",
+                                "logs:CreateLogStream",
+                                "logs:PutLogEvents",
+                                "logs:AssociateKmsKey",
+                            ],
+                            "Resource": ["arn:aws:logs:*:*:/aws-glue/*"],
+                        }
+                    ],
+                }
+            ),
+        )
+
+        role_policy_attachment_cloudwatch = aws.iam.RolePolicyAttachment(
+            "role-policy-attachment-cloudwatch",
+            role=glue_role.name,
+            policy_arn=cloudwatch_policy.arn,
         )
 
         role_policy_attachment_s3 = aws.iam.RolePolicyAttachment(
@@ -492,6 +516,11 @@ class PulumiContextManager:
             ),
         )
         incremental_column = get_incremental_column(table_path / f"{job_type}.py")
+        log_group = aws.cloudwatch.LogGroup(
+            f"glue-job-logs-{table_path.name}-{job_type}",
+            name=f"/aws-glue/jobs/{self.config.project_slug}-{table_path.name}-{job_type}",
+            retention_in_days=30,
+        )
         glue_job = aws.glue.Job(
             f"glue-job-{table_path.name}",
             name=f"{self.config.project_slug}-{table_path.name}-{job_type}",
@@ -503,7 +532,10 @@ class PulumiContextManager:
             timeout=3600,
             max_retries=0,
             default_arguments=pulumi.Output.all(
-                bucket=bucket_name, namespace=table_namespace
+                bucket=bucket_name,
+                namespace=table_namespace,
+                log_group=log_group.name,
+                bucket_arn=self.table_bucket.arn,
             ).apply(
                 lambda args: {
                     "--JOB_NAME": f"{self.config.project_slug}-{table_path.name}-{job_type}",
@@ -513,28 +545,59 @@ class PulumiContextManager:
                     "--ConnectionProperties": json.dumps(connection_args.model_dump()),
                     "--GlueDBName": self.glue_catalog_database.name,
                     "--SQLTable": table_path.name,
-                    "--SQLQuery": "",
+                    "--SQLQuery": " ",
                     "--OutputS3Path": pulumi.Output.concat(
                         "s3tablesbucket.", args["namespace"], ".", table_path.name
                     ),
                     "--IncrementalColumn": incremental_column,
                     "--IsFullLoad": "false",
                     "--JobLanguage": "python",
+                    # CloudWatch Logs
                     "--enable-continuous-cloudwatch-log": "true",
                     "--enable-metrics": "true",
+                    "--continuous-log-logGroup": args["log_group"],
                     "--enable-spark-ui": "true",
                     "--spark-event-logs-path": pulumi.Output.concat(
                         "s3://", args["bucket"], "/spark-logs/"
                     ),
+                    # End CloudWatch Logs
                     "--enable-job-insights": "true",
                     "--job-bookmark-option": "job-bookmark-enable",
                     "--TempDir": pulumi.Output.concat(
                         "s3://", args["bucket"], "/temporary/"
                     ),
                     "--enable-glue-datacatalog": "true",
-                    "--conf": "spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions --conf spark.sql.catalog.glue_catalog=org.apache.iceberg.spark.SparkCatalog --conf spark.sql.catalog.glue_catalog.warehouse=s3://",
-                    "--additional-python-modules": "nextdata==0.1.5 boto3==1.26.137",
+                    # "--conf": (
+                    #     "spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions"
+                    #     " --conf spark.sql.catalog.glue_catalog=org.apache.iceberg.spark.SparkCatalog"
+                    #     " --conf spark.sql.catalog.glue_catalog.warehouse=s3://"
+                    # ),
+                    # Update the conf parameter with complete Iceberg and S3 Tables configuration
+                    "--conf": (
+                        "spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions "
+                        "--conf spark.sql.catalog.s3tablesbucket=org.apache.iceberg.spark.SparkCatalog "
+                        "--conf spark.sql.catalog.s3tablesbucket.catalog-impl=software.amazon.s3tables.iceberg.S3TablesCatalog "
+                        f"--conf spark.sql.catalog.s3tablesbucket.warehouse={args['bucket_arn']} "
+                        "--conf spark.sql.iceberg.handle-timestamp-without-timezone=true"
+                    ),
+                    # Add required extra jars and packages
+                    "--extra-jars": (
+                        "s3://aws-glue-native-sparketl/jars/aws-glue-libs/s3-tables-catalog-for-iceberg-runtime-0.1.3.jar,"
+                        "s3://aws-glue-native-sparketl/jars/aws-glue-libs/iceberg-spark-runtime-3.5_2.12-1.6.1.jar"
+                    ),
+                    "--extra-py-files": "s3://aws-glue-native-sparketl/jars/aws-glue-libs/iceberg-spark-runtime-3.5_2.12-1.6.1.jar",
+                    "--additional-python-modules": "nextdata==0.1.10 boto3==1.35.87 pyiceberg==0.5.1",
                     "--datalake-formats": "iceberg",
+                    # Set config values as env variables
+                    "--project_name": self.config.project_name,
+                    "--project_slug": self.config.project_slug,
+                    "--aws_region": self.config.aws_region,
+                    "--project_dir": str(self.config.project_dir),
+                    "--data_dir": str(self.config.data_dir),
+                    "--connections_dir": str(self.config.connections_dir),
+                    "--stack_name": self.config.stack_name,
+                    "--bucket_arn": args["bucket_arn"],
+                    "--namespace": args["namespace"],
                 }
             ),
             command=aws.glue.JobCommandArgs(
@@ -622,6 +685,10 @@ class PulumiContextManager:
             None,
         )
         tables = [r for r in resources if r["type"] == "aws:s3tables/table:Table"]
+        glue_role_arn = next(
+            (r for r in resources if r["type"] == "aws:iam/role:Role"),
+            None,
+        )
         return StackOutputs(
             project_name=project_name,
             stack_name=stack_name,
@@ -629,6 +696,7 @@ class PulumiContextManager:
             table_bucket=table_bucket,
             table_namespace=table_namespace,
             tables=tables,
+            glue_role_arn=glue_role_arn["outputs"]["arn"],
         )
 
     @classmethod

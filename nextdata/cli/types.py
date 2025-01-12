@@ -11,6 +11,7 @@ class StackOutputs(BaseModel):
     table_bucket: dict
     table_namespace: dict
     tables: list[dict]
+    glue_role_arn: str
 
 
 class SparkSchemaSpec(BaseModel):

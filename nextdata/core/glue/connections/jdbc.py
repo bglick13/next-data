@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Literal, Optional
 
 from nextdata.core.glue.connections.generic_connection import (
     GenericConnectionGlueJobArgs,
@@ -16,4 +16,4 @@ class JDBCGlueJobArgs(GenericConnectionGlueJobArgs):
     port: int
     database: str
     username: str
-    password: str
+    password: Optional[str] = None

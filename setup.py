@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="nextdata",
-    version="0.1.5",
+    version="0.1.10",
     packages=find_packages(
         exclude=[
             "*.node_modules",

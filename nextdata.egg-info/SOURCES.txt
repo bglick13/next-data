@@ -3,6 +3,7 @@
 MANIFEST.in
 README.md
 pyproject.toml
+requirements.txt
 setup.py
 examples/default/.gitignore
 examples/default/requirements.txt
@@ -122,11 +123,13 @@ nextdata/cli/__pycache__/pulumi_context_manager.cpython-313.pyc
 nextdata/cli/__pycache__/spark_manager.cpython-313.pyc
 nextdata/cli/__pycache__/types.cpython-313.pyc
 nextdata/cli/commands/__init__.py
+nextdata/cli/commands/aws.py
 nextdata/cli/commands/dev_server.py
 nextdata/cli/commands/main.py
 nextdata/cli/commands/pulumi.py
 nextdata/cli/commands/spark.py
 nextdata/cli/commands/__pycache__/__init__.cpython-313.pyc
+nextdata/cli/commands/__pycache__/aws.cpython-313.pyc
 nextdata/cli/commands/__pycache__/dev_server.cpython-313.pyc
 nextdata/cli/commands/__pycache__/main.cpython-313.pyc
 nextdata/cli/commands/__pycache__/pulumi.cpython-313.pyc
