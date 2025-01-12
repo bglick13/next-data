@@ -12,6 +12,8 @@ class StackOutputs(BaseModel):
     table_namespace: dict
     tables: list[dict]
     glue_role_arn: str
+    emr_app_id: str
+    emr_script_bucket: str
 
 
 class SparkSchemaSpec(BaseModel):

@@ -7,7 +7,7 @@ import { Suspense } from "react";
 export default async function Page({
   params,
 }: {
-  params: { data_table: string };
+  params: Promise<{ data_table: string }>;
 }) {
   const { data_table } = await params;
 
