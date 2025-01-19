@@ -14,14 +14,12 @@ def spark():
 async def create_session():
     pulumi_context_manager = PulumiContextManager()
     pulumi_context_manager.initialize_stack()
-    stack_outputs = pulumi_context_manager.get_stack_outputs()
     spark_manager = SparkManager()
 
     # Initialize variables in global namespace
     globals().update(
         {
             "pulumi_context_manager": pulumi_context_manager,
-            "stack_outputs": stack_outputs,
             "spark": spark_manager,
         }
     )

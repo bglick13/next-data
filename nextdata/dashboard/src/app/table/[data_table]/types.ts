@@ -1,4 +1,4 @@
-import { jsTypeToSparkDtype } from "./util";
+import type { jsTypeToSparkDtype } from "./util";
 
 export interface TableMetadata {
   schema?: string[][]; // [column_name, column_type]

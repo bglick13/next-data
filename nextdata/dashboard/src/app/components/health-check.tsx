@@ -17,7 +17,9 @@ interface PulumiResource {
   urn: string;
   custom: boolean;
   type: string;
+  // biome-ignore lint/suspicious/noExplicitAny: <explanation>
   inputs: { [key: string]: any };
+  // biome-ignore lint/suspicious/noExplicitAny: <explanation>
   outputs?: { [key: string]: any };
   created: string;
   modified: string;
@@ -90,27 +92,27 @@ export function HealthCheckIndicator() {
           <div className="grid gap-2">
             <h4 className="font-medium leading-none">Stack Name</h4>
             <p className="text-sm text-muted-foreground">
-              {data?.stack_outputs.stack_name}
+              {data?.stack_outputs?.stack_name}
             </p>
             <h4 className="font-medium leading-none">Project Name</h4>
             <p className="text-sm text-muted-foreground">
-              {data?.stack_outputs.project_name}
+              {data?.stack_outputs?.project_name}
             </p>
             <h4 className="font-medium leading-none"># of Resources</h4>
             <p className="text-sm text-muted-foreground">
-              {data?.stack_outputs.resources.length}
+              {data?.stack_outputs?.resources?.length}
             </p>
             <h4 className="font-medium leading-none">Table Bucket</h4>
             <p className="text-sm text-muted-foreground">
-              {data?.stack_outputs.table_bucket.outputs?.name}
+              {data?.stack_outputs?.table_bucket?.outputs?.name}
             </p>
             <h4 className="font-medium leading-none">Table Namespace</h4>
             <p className="text-sm text-muted-foreground">
-              {data?.stack_outputs.table_namespace.outputs?.namespace}
+              {data?.stack_outputs?.table_namespace?.outputs?.namespace}
             </p>
             <h4 className="font-medium leading-none">Tables</h4>
             <p className="text-sm text-muted-foreground">
-              {data?.stack_outputs.tables.length}
+              {data?.stack_outputs?.tables?.length}
             </p>
           </div>
         </div>

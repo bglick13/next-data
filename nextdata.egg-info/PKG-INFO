@@ -1,6 +1,6 @@
 Metadata-Version: 2.2
 Name: nextdata
-Version: 0.1.10
+Version: 0.1.12
 Summary: NextData is a framework for building data pipelines with a focus on simplicity and scalability.
 Home-page: https://github.com/bglick13/next-data
 Author: Benjamin Glickenhaus
@@ -24,6 +24,7 @@ Requires-Dist: pulumi-aws>=6.66.0
 Requires-Dist: python-dotenv>=1.0.0
 Requires-Dist: pyspark>=3.5.4
 Requires-Dist: python-multipart>=0.0.20
+Requires-Dist: docker>=6.0.0
 Dynamic: author
 Dynamic: author-email
 Dynamic: classifier

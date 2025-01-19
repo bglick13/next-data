@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="nextdata",
-    version="0.1.10",
+    version="0.1.12",
     packages=find_packages(
         exclude=[
             "*.node_modules",
@@ -26,6 +26,7 @@ setup(
         "python-dotenv>=1.0.0",  # For environment variables,
         "pyspark>=3.5.4",  # For Spark,
         "python-multipart>=0.0.20",  # For multipart/form-data parsing
+        "docker>=6.0.0",  # For Docker,
     ],
     entry_points={
         "console_scripts": [

@@ -25,6 +25,7 @@ class SparkManager:
             "org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.6.1",
             "software.amazon.s3tables:s3-tables-catalog-for-iceberg-runtime:0.1.3",
             "software.amazon.awssdk:bundle:2.21.1",
+            # "software.amazon.jdbc:aws-advanced-jdbc-wrapper:2.5.4",
         ]
 
         return (

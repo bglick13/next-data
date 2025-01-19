@@ -10,3 +10,4 @@ pulumi-aws>=6.66.0
 python-dotenv>=1.0.0
 pyspark>=3.5.4
 python-multipart>=0.0.20
+docker>=6.0.0

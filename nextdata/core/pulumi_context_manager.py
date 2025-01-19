@@ -1,4 +1,5 @@
 import json
+import subprocess
 from typing import Literal
 import click
 import pulumi
@@ -6,11 +7,23 @@ import pulumi_aws as aws
 from pulumi import automation as auto
 from pathlib import Path
 
+import os
+
 from nextdata.cli.types import StackOutputs
 import importlib.util
 import importlib.resources
 
 
+from nextdata.core.db.db_manager import DatabaseManager
+from nextdata.core.db.models import (
+    AwsResource,
+    ConnectionType,
+    EmrJob,
+    EmrJobScript,
+    HumanReadableName,
+    JobType,
+    S3DataTable,
+)
 from nextdata.util.framework_magic import (
     get_connection_args,
     get_connection_name,
@@ -63,10 +76,13 @@ Handles the creation and management of Pulumi stack and AWS resources.
 class PulumiContextManager:
     def __init__(self):
         self.config = NextDataConfig.from_env()
+        db_path = self.config.project_dir / "nextdata.db"
+        self.db_manager = DatabaseManager(db_path)
+
         self._stack = None
         self._table_bucket = None
         self._table_namespace = None
-        self._tables = {}  # Keep track of tables by name
+        self._tables: dict[str, S3DataTable] = {}  # Keep track of tables by name
         self._iam_role = None
         self._iam_role_policy_attachment_s3 = None
         self._iam_role_policy_attachment_glue = None
@@ -209,16 +225,9 @@ class PulumiContextManager:
                     "Statement": [
                         {
                             "Action": [
-                                # "elasticmapreduce:CreateStudioPresignedUrl",
-                                # "elasticmapreduce:DescribeStudio",
-                                # "elasticmapreduce:CreateStudio",
-                                # "elasticmapreduce:ListStudios"
-                                # "elasticmapreduce:ListSteps",
-                                # "elasticmapreduce:ListClusters",
-                                # "elasticmapreduce:DescribeCluster",
-                                # "elasticmapreduce:DescribeStep",
                                 "emr-serverless:*",
                                 "emr:StartJobRun",
+                                "iam:PassRole",
                             ],
                             "Effect": "Allow",
                             "Resource": ["*"],
@@ -272,8 +281,14 @@ class PulumiContextManager:
                                 "logs:CreateLogStream",
                                 "logs:PutLogEvents",
                                 "logs:AssociateKmsKey",
+                                "logs:GetLogEvents",
+                                "logs:DescribeLogStreams",
+                                "logs:DescribeLogGroups",
                             ],
-                            "Resource": ["arn:aws:logs:*:*:/aws-glue/*"],
+                            "Resource": [
+                                "arn:aws:logs:*:*:/aws-glue/*",
+                                "arn:aws:logs:*:*:/aws-emr-serverless-logs/*",
+                            ],
                         }
                     ],
                 }
@@ -312,6 +327,22 @@ class PulumiContextManager:
             policy_arn="arn:aws:iam::aws:policy/AWSLakeFormationDataAdmin",
         )
         self._iam_role = glue_role
+        pulumi.Output.all(
+            name=glue_role.name,
+            resource_type="iam_role",
+            resource_id=glue_role.id,
+            resource_arn=glue_role.arn,
+        ).apply(
+            lambda args: self.db_manager.add_resource(
+                AwsResource(
+                    name=args["name"],
+                    human_readable_name=HumanReadableName.GLUE_ROLE,
+                    resource_type=args["resource_type"],
+                    resource_id=args["resource_id"],
+                    resource_arn=args["resource_arn"],
+                )
+            )
+        )
         self._iam_role_policy_attachment_s3 = role_policy_attachment_s3
         self._iam_role_policy_attachment_glue = role_policy_attachment_glue
         self._iam_role_policy_attachment_athena = role_policy_attachment_athena
@@ -352,8 +383,8 @@ class PulumiContextManager:
             type="SPARK",
             release_label="emr-7.5.0",
             maximum_capacity=aws.emrserverless.ApplicationMaximumCapacityArgs(
-                cpu="4 vCPU",
-                memory="16 GB",
+                cpu="16 vCPU",
+                memory="128 GB",
             ),
             initial_capacities=[
                 aws.emrserverless.ApplicationInitialCapacityArgs(
@@ -368,6 +399,13 @@ class PulumiContextManager:
                 ),
             ],
         )
+        pulumi.Output.all(
+            name=emr_app.name,
+            resource_type="emr_app",
+            human_readable_name=HumanReadableName.EMR_APP,
+            resource_id=emr_app.id,
+            resource_arn=emr_app.arn,
+        ).apply(lambda args: self.db_manager.add_resource(AwsResource(**args)))
         # emr_studio = aws.emr.Studio(
         #     "emr-studio",
         #     name=f"{self.config.project_slug}-studio",
@@ -380,6 +418,13 @@ class PulumiContextManager:
             "glue-job-bucket",
             force_destroy=True,
         )
+        pulumi.Output.all(
+            name=glue_job_bucket.bucket,
+            human_readable_name=HumanReadableName.GLUE_JOB_BUCKET,
+            resource_type="s3_bucket",
+            resource_id=glue_job_bucket.id,
+            resource_arn=glue_job_bucket.arn,
+        ).apply(lambda args: self.db_manager.add_resource(AwsResource(**args)))
         # Add bucket policy to allow Glue to access scripts
         glue_job_bucket_policy = aws.s3.BucketPolicy(
             "glue-job-bucket-policy",
@@ -422,6 +467,11 @@ class PulumiContextManager:
             ),
             opts=pulumi.ResourceOptions(depends_on=[glue_job_bucket]),
         )
+        pulumi.Output.all(
+            name="scripts/default_etl_script.py",
+            s3_path="scripts/default_etl_script.py",
+            bucket=glue_job_bucket.bucket,
+        ).apply(lambda args: self.db_manager.add_script(EmrJobScript(**args)))
         # self._glue_catalog_database = glue_catalog_database
         pulumi.export("emr-app", emr_app.name)
         pulumi.export("emr-app-arn", emr_app.arn)
@@ -441,6 +491,13 @@ class PulumiContextManager:
                 bucket_name,
                 name=bucket_name,
             )
+            pulumi.Output.all(
+                name=bucket_name,
+                human_readable_name=HumanReadableName.S3_TABLE_BUCKET,
+                resource_type="s3_table_bucket",
+                resource_id=self._table_bucket.id,
+                resource_arn=self._table_bucket.arn,
+            ).apply(lambda args: self.db_manager.add_resource(AwsResource(**args)))
 
         if not self._table_namespace:
             namespace_name = f"{self.config.project_slug}namespace"
@@ -449,6 +506,13 @@ class PulumiContextManager:
                 namespace=namespace_name,
                 table_bucket_arn=self._table_bucket.arn,
             )
+            pulumi.Output.all(
+                name=namespace_name,
+                human_readable_name=HumanReadableName.S3_TABLE_NAMESPACE,
+                resource_type="s3_table_namespace",
+                resource_id=self._table_namespace.id,
+                resource_arn="",
+            ).apply(lambda args: self.db_manager.add_resource(AwsResource(**args)))
 
     def _ensure_existing_tables(self):
         """Ensure tables exist"""
@@ -470,6 +534,9 @@ class PulumiContextManager:
                 lambda ns: ns.replace("-", "_")
             ),
             format="ICEBERG",
+        )
+        pulumi.Output.all(name=safe_name).apply(
+            lambda args: self.db_manager.add_table(S3DataTable(**args))
         )
 
         # Export the table location
@@ -552,12 +619,75 @@ class PulumiContextManager:
             lambda args: args["bucket"]
         )
 
+    def _package_requirements(self, requirements: str) -> str:
+        """
+        Package requirements into a virtualenv using Docker and upload to S3.
+        Returns the S3 path to the packaged venv.
+        """
+        venv_dir = "."
+        os.makedirs(venv_dir, exist_ok=True)
+
+        # Write requirements to a file
+        requirements_path = os.path.join(venv_dir, "requirements.txt")
+        with open(requirements_path, "w") as f:
+            f.write(requirements)
+            f.write("\nvenv-pack==0.2.0")
+
+        # Create Dockerfile that copies and installs requirements file
+        dockerfile_content = """
+# syntax=docker/dockerfile:1.4
+FROM --platform=linux/amd64 public.ecr.aws/amazonlinux/amazonlinux:2023-minimal AS builder
+
+RUN dnf install -y gcc python3 python3-devel
+ENV VIRTUAL_ENV=/opt/venv
+
+RUN python3 -m venv $VIRTUAL_ENV
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+
+RUN python3 -m pip install --upgrade pip
+
+COPY requirements.txt /requirements.txt
+RUN python3 -m pip install -r /requirements.txt
+
+RUN mkdir /output && venv-pack -o /output/venv.tar.gz
+
+FROM scratch
+COPY --from=builder /output/venv.tar.gz /
+"""
+        dockerfile_path = "./Dockerfile"
+        with open(dockerfile_path, "w") as f:
+            f.write(dockerfile_content)
+
+        # Set up BuildKit output directory
+        os.environ["DOCKER_BUILDKIT"] = "1"
+        docker_build_command = (
+            f"docker build -t venv-builder:latest -f {dockerfile_path} --output . ."
+        )
+        subprocess.run(docker_build_command, shell=True, check=True)
+
+        # The venv.tar.gz file should now be in the output directory
+        venv_path = "./venv.tar.gz"
+        print(f"venv_path: {venv_path}")
+        if not os.path.exists(venv_path):
+            raise Exception("Failed to extract venv.tar.gz from Docker build")
+
+        # Upload to S3
+        venv_key = f"venvs/{self.config.project_slug}-{hash(requirements)}.tar.gz"
+        venv_object = aws.s3.BucketObject(
+            f"venv-{hash(requirements)}",
+            bucket=self.glue_job_bucket.id,
+            key=venv_key,
+            source=pulumi.asset.FileAsset(venv_path),
+            opts=pulumi.ResourceOptions(depends_on=[self.glue_job_bucket]),
+        )
+
+        return venv_key
+
     def _setup_glue_job(self, table_path: Path, job_type: Literal["etl", "retl"]):
         """Setup a glue job for a table"""
         # Check if there's a custom etl script for this table by looking for an etl.py file with a @glue_job decorator
         bucket_name = self.glue_job_bucket.bucket
         table_namespace = self.table_namespace.namespace
-
         if has_custom_glue_job(table_path / f"{job_type}.py"):
             script_key = f"scripts/{table_path.name}/{job_type}.py"
             custom_script = aws.s3.BucketObject(
@@ -567,16 +697,13 @@ class PulumiContextManager:
                 source=pulumi.asset.FileAsset(table_path / f"{job_type}.py"),
                 opts=pulumi.ResourceOptions(depends_on=[self.glue_job_bucket]),
             )
+            pulumi.Output.all(
+                name=script_key,
+                s3_path=script_key,
+                bucket=bucket_name,
+            ).apply(lambda args: self.db_manager.add_script(EmrJobScript(**args)))
         else:
             script_key = "scripts/default_etl_script.py"
-
-        # Create script_location using Output.concat
-        script_location = pulumi.Output.concat(
-            "s3://",
-            bucket_name,
-            "/",
-            script_key,
-        )
 
         # Get the connection name from the etl.py file by checking connection_name variable
         connection_name = get_connection_name(table_path / f"{job_type}.py")
@@ -590,117 +717,38 @@ class PulumiContextManager:
         connection_args = get_connection_args(
             connection_name, self.config.connections_dir
         )
-        # Export values for debugging
-        pulumi.export("Glue Job Bucket", self._get_glue_job_bucket_name())
-        pulumi.export("Script Key", script_key)
-        # Export script_location using Output.concat
-        pulumi.export(
-            "Script location",
-            pulumi.Output.concat(
-                "s3://", self._get_glue_job_bucket_name(), "/", script_key
-            ),
-        )
+
+        # Package requirements and get S3 path
+        with open(Path(__file__).parent / "glue" / "requirements.txt") as f:
+            requirements = f.read()
+            venv_s3_path = self._package_requirements(requirements)
+
         incremental_column = get_incremental_column(table_path / f"{job_type}.py")
-        log_group = aws.cloudwatch.LogGroup(
-            f"glue-job-logs-{table_path.name}-{job_type}",
-            name=f"/aws-glue/jobs/{self.config.project_slug}-{table_path.name}-{job_type}",
-            retention_in_days=30,
-        )
-        # glue_job = aws.glue.Job(
-        #     f"glue-job-{table_path.name}",
-        #     name=f"{self.config.project_slug}-{table_path.name}-{job_type}",
-        #     role_arn=self.iam_role.arn,
-        #     glue_version="4.0",
-        #     # connections=[connection_name],
-        #     number_of_workers=2,
-        #     worker_type="G.1X",
-        #     timeout=3600,
-        #     max_retries=0,
-        #     default_arguments=pulumi.Output.all(
-        #         bucket=bucket_name,
-        #         namespace=table_namespace,
-        #         log_group=log_group.name,
-        #         bucket_arn=self.table_bucket.arn,
-        #     ).apply(
-        #         lambda args: {
-        #             "--JOB_NAME": f"{self.config.project_slug}-{table_path.name}-{job_type}",
-        #             "--JobType": "GLUE_ETL",
-        #             "--ConnectionName": connection_name,
-        #             "--ConnectionType": connection_args.connection_type,
-        #             "--ConnectionProperties": json.dumps(connection_args.model_dump()),
-        #             "--GlueDBName": self.glue_catalog_database.name,
-        #             "--SQLTable": table_path.name,
-        #             "--SQLQuery": " ",
-        #             "--OutputS3Path": pulumi.Output.concat(
-        #                 "s3tablesbucket.", args["namespace"], ".", table_path.name
-        #             ),
-        #             "--IncrementalColumn": incremental_column,
-        #             "--IsFullLoad": "false",
-        #             "--JobLanguage": "python",
-        #             # CloudWatch Logs
-        #             "--enable-continuous-cloudwatch-log": "true",
-        #             "--enable-metrics": "true",
-        #             "--continuous-log-logGroup": args["log_group"],
-        #             "--enable-spark-ui": "true",
-        #             "--spark-event-logs-path": pulumi.Output.concat(
-        #                 "s3://", args["bucket"], "/spark-logs/"
-        #             ),
-        #             # End CloudWatch Logs
-        #             "--enable-job-insights": "true",
-        #             "--job-bookmark-option": "job-bookmark-enable",
-        #             "--TempDir": pulumi.Output.concat(
-        #                 "s3://", args["bucket"], "/temporary/"
-        #             ),
-        #             "--enable-glue-datacatalog": "true",
-        #             # "--conf": (
-        #             #     "spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions"
-        #             #     " --conf spark.sql.catalog.glue_catalog=org.apache.iceberg.spark.SparkCatalog"
-        #             #     " --conf spark.sql.catalog.glue_catalog.warehouse=s3://"
-        #             # ),
-        #             # Update the conf parameter with complete Iceberg and S3 Tables configuration
-        #             "--conf": (
-        #                 "spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions "
-        #                 "--conf spark.sql.catalog.s3tablesbucket=org.apache.iceberg.spark.SparkCatalog "
-        #                 "--conf spark.sql.catalog.s3tablesbucket.catalog-impl=software.amazon.s3tables.iceberg.S3TablesCatalog "
-        #                 f"--conf spark.sql.catalog.s3tablesbucket.warehouse={args['bucket_arn']} "
-        #                 "--conf spark.sql.iceberg.handle-timestamp-without-timezone=true"
-        #             ),
-        #             # Add required extra jars and packages
-        #             "--extra-jars": (
-        #                 "s3://aws-glue-native-sparketl/jars/aws-glue-libs/s3-tables-catalog-for-iceberg-runtime-0.1.3.jar,"
-        #                 "s3://aws-glue-native-sparketl/jars/aws-glue-libs/iceberg-spark-runtime-3.5_2.12-1.6.1.jar"
-        #             ),
-        #             "--extra-py-files": "s3://aws-glue-native-sparketl/jars/aws-glue-libs/iceberg-spark-runtime-3.5_2.12-1.6.1.jar",
-        #             "--additional-python-modules": "nextdata==0.1.10 boto3==1.35.87 pyiceberg==0.5.1",
-        #             "--datalake-formats": "iceberg",
-        #             # Set config values as env variables
-        #             "--project_name": self.config.project_name,
-        #             "--project_slug": self.config.project_slug,
-        #             "--aws_region": self.config.aws_region,
-        #             "--project_dir": str(self.config.project_dir),
-        #             "--data_dir": str(self.config.data_dir),
-        #             "--connections_dir": str(self.config.connections_dir),
-        #             "--stack_name": self.config.stack_name,
-        #             "--bucket_arn": args["bucket_arn"],
-        #             "--namespace": args["namespace"],
-        #         }
-        #     ),
-        #     command=aws.glue.JobCommandArgs(
-        #         name="glue-etl-job-script",
-        #         python_version="3",
-        #         script_location=script_location,
-        #     ),
-        #     opts=pulumi.ResourceOptions(
-        #         depends_on=[
-        #             self._glue_etl_job_script,
-        #             (
-        #                 custom_script
-        #                 if has_custom_glue_job(table_path / f"{job_type}.py")
-        #                 else self._glue_etl_job_script
-        #             ),
-        #         ]
-        #     ),
-        # )
+        if job_type == "etl":
+            pulumi.Output.all(
+                script_arn=self._glue_etl_job_script.arn,
+                output_table=self._tables[table_path.name].name,
+            ).apply(
+                lambda args: self.db_manager.add_job(
+                    EmrJob(
+                        name=f"{self.config.project_slug}-{table_path.name}-{job_type}",
+                        job_type=JobType.ETL,
+                        connection_name=connection_name,
+                        connection_type=ConnectionType(connection_args.connection_type),
+                        connection_properties=json.dumps(connection_args.model_dump()),
+                        sql_table=table_path.name,
+                        incremental_column=incremental_column,
+                        is_full_load=False,
+                        script_id=self.db_manager.get_script_by_name(script_key).id,
+                        requirements=requirements,
+                        venv_s3_path=venv_s3_path,
+                    ),
+                    input_tables=[],
+                    output_tables=[self.db_manager.get_table_by_name(table_path.name)],
+                )
+            )
+        elif job_type == "retl":
+            pass
 
     def _discover_etl_scripts(self):
         """Discover etl scripts in the data directory and setup glue jobs for them."""
@@ -721,6 +769,7 @@ class PulumiContextManager:
 
     def create_stack(self):
         """Create or update the entire stack"""
+        self.db_manager.reset()
         self.initialize_stack()
         up_result = self.stack.up(on_output=lambda msg: click.echo(f"Pulumi: {msg}"))
         return up_result
@@ -797,9 +846,11 @@ class PulumiContextManager:
             table_bucket=table_bucket,
             table_namespace=table_namespace,
             tables=tables,
-            glue_role_arn=glue_role_arn["outputs"]["arn"],
-            emr_app_id=emr_app_id["outputs"]["id"],
-            emr_script_bucket=emr_script_bucket["outputs"]["arn"],
+            glue_role=glue_role_arn,
+            emr_app=emr_app_id,
+            emr_script_bucket=emr_script_bucket,
+            emr_scripts=[],
+            emr_jobs=[],
         )
 
     @classmethod
