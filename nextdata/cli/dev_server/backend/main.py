@@ -251,6 +251,7 @@ async def trigger_job(
                     "--conf spark.executor.instances=1 "
                     "--conf spark.driver.cores=1 "
                     "--conf spark.driver.memory=4G "
+                    f"--jars s3://{job.script.bucket}/postgresql-42.6.0.jar "
                     f"--conf spark.archives=s3://{job.script.bucket}/{job.venv_s3_path}#environment "
                     f"--conf spark.emr-serverless.driverEnv.PYSPARK_DRIVER_PYTHON=./environment/bin/python "
                     f"--conf spark.emr-serverless.driverEnv.PYSPARK_PYTHON=./environment/bin/python "

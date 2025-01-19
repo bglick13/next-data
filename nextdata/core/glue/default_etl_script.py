@@ -132,7 +132,20 @@ def main(
         password=password,
         ssl="true",
         sslmode="require",
-        driver="com.postgresql.jdbc.Driver",
+        driver="org.postgresql.Driver",
+    )
+
+    print(f"Connection options: {connection_options}")
+
+    # Add more JDBC properties for debugging
+    connection_options.update(
+        {
+            "loginTimeout": "60",  # Connection timeout in seconds
+            "logLevel": "2",  # Detailed JDBC logging (1-4)
+            "socketTimeout": "60",  # Socket timeout in seconds
+            "connectTimeout": "60",  # Connect timeout in seconds
+            "tcpKeepAlive": "true",  # Keep-alive in seconds
+        }
     )
 
     partition_strategy = get_partition_strategy(
@@ -141,7 +154,7 @@ def main(
         job_args.sql_table,
         job_args.incremental_column,
     )
-    logger.info(f"Partition strategy: {partition_strategy}")
+    print(f"Partition strategy: {partition_strategy}")
 
     if partition_strategy.type == "numeric":
         source_df: DataFrame = spark_manager.spark.read.jdbc(
