@@ -136,7 +136,6 @@ def main(
     job_args: GlueJobArgs,
 ):
     # Read source data into a Spark DataFrame
-    spark_manager.spark.sparkContext.addArchive
     base_query = f"SELECT * FROM {job_args.sql_table}"
     logger.info(f"Base query: {base_query}")
     connection_conf = None
@@ -145,8 +144,8 @@ def main(
         connection_args: dict[str, Any] = job_args.connection_properties
         connection_conf = DSQLGlueJobArgs(host=connection_args["host"])
         password = generate_dsql_password(connection_conf.host)
-    elif job_args.ConnectionType == "jdbc":
-        connection_conf = JDBCGlueJobArgs(**job_args.ConnectionProperties)
+    elif job_args.connection_type == "jdbc":
+        connection_conf = JDBCGlueJobArgs(**job_args.connection_properties)
         password = connection_conf.password
     else:
         raise ValueError(f"Unsupported connection type: {job_args.connection_type}")
@@ -160,8 +159,6 @@ def main(
         sslmode="require",
         driver="org.postgresql.Driver",
     )
-
-    print(f"Connection options: {connection_options}")
 
     # Add more JDBC properties for debugging
     connection_options.update(
