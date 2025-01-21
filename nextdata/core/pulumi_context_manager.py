@@ -200,6 +200,30 @@ class PulumiContextManager:
                 }
             ),
         )
+
+        s3_tables_policy = aws.iam.RolePolicy(
+            "s3-tables-policy",
+            role=glue_role.id,
+            policy=json.dumps(
+                {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Action": [
+                                "s3tables:*",
+                                "s3:GetObject",
+                                "s3:PutObject",
+                                "s3:DeleteObject",
+                            ],
+                            "Effect": "Allow",
+                            "Resource": ["*"],
+                        }
+                    ],
+                }
+            ),
+        )
+
+        # Add glue policy
         glue_policy = aws.iam.Policy(
             "glue-policy",
             policy=json.dumps(
@@ -370,13 +394,137 @@ class PulumiContextManager:
                         policy_arn=policy.arn,
                     )
 
+    def _setup_vpc(self):
+        """Create VPC and networking resources for EMR Serverless"""
+        # Create VPC
+        vpc = aws.ec2.Vpc(
+            "emr-vpc",
+            cidr_block="10.0.0.0/16",
+            enable_dns_hostnames=True,
+            enable_dns_support=True,
+        )
+
+        # Create an internet gateway
+        igw = aws.ec2.InternetGateway(
+            "emr-igw",
+            vpc_id=vpc.id,
+        )
+
+        # Create public and private subnets across two AZs
+        public_subnet_1 = aws.ec2.Subnet(
+            "emr-public-subnet-1",
+            vpc_id=vpc.id,
+            cidr_block="10.0.1.0/24",
+            availability_zone=f"{self.config.aws_region}a",
+            map_public_ip_on_launch=True,
+        )
+
+        public_subnet_2 = aws.ec2.Subnet(
+            "emr-public-subnet-2",
+            vpc_id=vpc.id,
+            cidr_block="10.0.2.0/24",
+            availability_zone=f"{self.config.aws_region}b",
+            map_public_ip_on_launch=True,
+        )
+
+        private_subnet_1 = aws.ec2.Subnet(
+            "emr-private-subnet-1",
+            vpc_id=vpc.id,
+            cidr_block="10.0.3.0/24",
+            availability_zone=f"{self.config.aws_region}a",
+        )
+
+        private_subnet_2 = aws.ec2.Subnet(
+            "emr-private-subnet-2",
+            vpc_id=vpc.id,
+            cidr_block="10.0.4.0/24",
+            availability_zone=f"{self.config.aws_region}b",
+        )
+
+        # Create an EIP for NAT Gateway
+        eip = aws.ec2.Eip("emr-nat-eip")
+
+        # Create NAT Gateway in the public subnet
+        nat_gateway = aws.ec2.NatGateway(
+            "emr-nat-gateway",
+            subnet_id=public_subnet_1.id,
+            allocation_id=eip.id,
+        )
+
+        # Create route tables
+        public_rt = aws.ec2.RouteTable(
+            "emr-public-rt",
+            vpc_id=vpc.id,
+            routes=[
+                aws.ec2.RouteTableRouteArgs(
+                    cidr_block="0.0.0.0/0",
+                    gateway_id=igw.id,
+                ),
+            ],
+        )
+
+        private_rt = aws.ec2.RouteTable(
+            "emr-private-rt",
+            vpc_id=vpc.id,
+            routes=[
+                aws.ec2.RouteTableRouteArgs(
+                    cidr_block="0.0.0.0/0",
+                    nat_gateway_id=nat_gateway.id,
+                ),
+            ],
+        )
+
+        # Associate route tables with subnets
+        public_rta_1 = aws.ec2.RouteTableAssociation(
+            "emr-public-rta-1",
+            subnet_id=public_subnet_1.id,
+            route_table_id=public_rt.id,
+        )
+
+        public_rta_2 = aws.ec2.RouteTableAssociation(
+            "emr-public-rta-2",
+            subnet_id=public_subnet_2.id,
+            route_table_id=public_rt.id,
+        )
+
+        private_rta_1 = aws.ec2.RouteTableAssociation(
+            "emr-private-rta-1",
+            subnet_id=private_subnet_1.id,
+            route_table_id=private_rt.id,
+        )
+
+        private_rta_2 = aws.ec2.RouteTableAssociation(
+            "emr-private-rta-2",
+            subnet_id=private_subnet_2.id,
+            route_table_id=private_rt.id,
+        )
+
+        # Create security group for EMR Serverless
+        emr_sg = aws.ec2.SecurityGroup(
+            "emr-security-group",
+            vpc_id=vpc.id,
+            description="Security group for EMR Serverless",
+            egress=[
+                aws.ec2.SecurityGroupEgressArgs(
+                    from_port=0,
+                    to_port=0,
+                    protocol="-1",
+                    cidr_blocks=["0.0.0.0/0"],
+                ),
+            ],
+        )
+
+        return {
+            "vpc": vpc,
+            "private_subnets": [private_subnet_1, private_subnet_2],
+            "security_group": emr_sg,
+        }
+
     def _setup_glue(self):
-        # Create a glue catalog database and set it up for AWS analytics service integration
-        # glue_catalog_database = aws.glue.CatalogDatabase(
-        #     "glue-catalog-database",
-        #     name=f"{self.config.project_slug}database",
-        #     catalog_id=self.table_bucket.owner_account_id,
-        # )
+        # Setup VPC and networking
+        network = self._setup_vpc()
+
+        # Create EMR Serverless application with VPC configuration
         emr_app = aws.emrserverless.Application(
             "emr-app",
             name=f"{self.config.project_slug}-app",
@@ -398,6 +546,10 @@ class PulumiContextManager:
                     ),
                 ),
             ],
+            network_configuration=aws.emrserverless.ApplicationNetworkConfigurationArgs(
+                subnet_ids=[subnet.id for subnet in network["private_subnets"]],
+                security_group_ids=[network["security_group"].id],
+            ),
         )
         pulumi.Output.all(
             name=emr_app.name,

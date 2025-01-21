@@ -44,17 +44,26 @@ def get_partition_strategy(
         properties=connection_options,
     )
 
+    # Create a map of column names to their data types
+    column_types = {
+        row["column_name"]: row["data_type"].lower() for row in columns_df.collect()
+    }
+
     # Look for best partition column in order of preference:
     # 1. Primary key or identity column
     # 2. Provided incremental column if numeric
     # 3. Any indexed numeric column
     # 4. Hash-based partitioning as fallback
 
+    # Get primary key columns
     pk_query = f"""
-    SELECT kcu.column_name
+    SELECT kcu.column_name, c.data_type
     FROM information_schema.table_constraints tc
     JOIN information_schema.key_column_usage kcu 
         ON tc.constraint_name = kcu.constraint_name
+    JOIN information_schema.columns c
+        ON kcu.column_name = c.column_name
+        AND kcu.table_name = c.table_name
     WHERE tc.table_name = '{table_name}' 
         AND tc.constraint_type = 'PRIMARY KEY'
     """
@@ -66,29 +75,43 @@ def get_partition_strategy(
     )
 
     if pk_df.count() > 0:
-        partition_col = pk_df.first()["column_name"]
-        # Get bounds for numeric partition column
-        bounds_query = f"""
-        SELECT MIN({partition_col}) as min_val, 
-               MAX({partition_col}) as max_val,
-               COUNT(*) as row_count
-        FROM {table_name}
-        """
-        bounds = spark_manager.spark.read.jdbc(
-            url=connection_options["url"],
-            table=f"({bounds_query}) AS tmp",
-            properties=connection_options,
-        ).first()
+        pk_row = pk_df.first()
+        partition_col = pk_row["column_name"]
+        data_type = pk_row["data_type"].lower()
+        numeric_types = {
+            "integer",
+            "bigint",
+            "smallint",
+            "decimal",
+            "numeric",
+            "real",
+            "double precision",
+        }
+        if data_type in numeric_types:
+            # Get bounds for numeric partition column
+            bounds_query = f"""
+            SELECT MIN({partition_col}) as min_val, 
+                MAX({partition_col}) as max_val,
+                COUNT(*) as row_count
+            FROM {table_name}
+            """
+            bounds = spark_manager.spark.read.jdbc(
+                url=connection_options["url"],
+                table=f"({bounds_query}) AS tmp",
+                properties=connection_options,
+            ).first()
 
-        return PartitionStrategy(
-            type="numeric",
-            column=partition_col,
-            lower_bound=bounds["min_val"],
-            upper_bound=bounds["max_val"] + 1,  # Add 1 to include max value
-            num_partitions=min(
-                100, max(10, bounds["row_count"] // 100000)
-            ),  # 100k rows per partition
-        )
+            return PartitionStrategy(
+                type="numeric",
+                column=partition_col,
+                lower_bound=bounds["min_val"],
+                upper_bound=bounds["max_val"] + 1,  # Add 1 to include max value
+                num_partitions=min(
+                    100, max(10, bounds["row_count"] // 100000)
+                ),  # 100k rows per partition
+            )
+        else:
+            logging.info(f"Primary key column {partition_col} is not numeric")
 
     # Fallback to hash-based partitioning
     return PartitionStrategy(
@@ -98,6 +121,9 @@ def get_partition_strategy(
             f"MOD(HASH(CAST(CONCAT({','.join(columns_df.select('column_name').rdd.flatMap(lambda x: x).collect())}) AS VARCHAR)), 10) = {i}"
             for i in range(10)
         ],
+        column=None,
+        lower_bound=None,
+        upper_bound=None,
     )
 
 
@@ -160,18 +186,18 @@ def main(
         source_df: DataFrame = spark_manager.spark.read.jdbc(
             url=connection_options["url"],
             table=job_args.sql_table,
-            column=partition_strategy["column"],
-            lowerBound=partition_strategy["lowerBound"],
-            upperBound=partition_strategy["upperBound"],
-            numPartitions=partition_strategy["numPartitions"],
+            column=partition_strategy.column,
+            lowerBound=partition_strategy.lower_bound,
+            upperBound=partition_strategy.upper_bound,
+            numPartitions=partition_strategy.num_partitions,
             properties=connection_options,
         )
     elif partition_strategy.type == "hash":
         source_df: DataFrame = (
             spark_manager.spark.read.option(
-                "numPartitions", partition_strategy["numPartitions"]
+                "numPartitions", partition_strategy.num_partitions
             )
-            .option("predicates", partition_strategy["predicates"])
+            .option("predicates", partition_strategy.predicates)
             .jdbc(
                 url=connection_options["url"],
                 table=job_args.sql_table,

@@ -238,6 +238,12 @@ async def trigger_job(
         args_list.append(f"--{name}")  # Add argument name separately
         args_list.append(str(value))  # Add value separately
     logging.error(f"Args List:\n{args_list}")
+    packages = [
+        "org.postgresql:postgresql:42.6.0",
+        "org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.6.1",
+        "software.amazon.s3tables:s3-tables-catalog-for-iceberg-runtime:0.1.3",
+        "software.amazon.awssdk:bundle:2.21.1",
+    ]
     response = emr_client.start_job_run(
         applicationId=emr_app_id,
         executionRoleArn=glue_role_arn,
@@ -251,7 +257,14 @@ async def trigger_job(
                     "--conf spark.executor.instances=1 "
                     "--conf spark.driver.cores=1 "
                     "--conf spark.driver.memory=4G "
-                    f"--jars s3://{job.script.bucket}/postgresql-42.6.0.jar "
+                    # Add dependencies using Maven coordinates
+                    f"--conf spark.jars.packages={','.join(packages)} "
+                    # Add iceberg and s3 extensions
+                    "--conf spark.sql.catalog.s3tablesbucket=org.apache.iceberg.spark.SparkCatalog "
+                    "--conf spark.sql.catalog.s3tablesbucket.catalog-impl=software.amazon.s3tables.iceberg.S3TablesCatalog "
+                    f"--conf spark.sql.catalog.s3tablesbucket.warehouse={args.bucket_arn} "
+                    "--conf spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions "
+                    # Add environment
                     f"--conf spark.archives=s3://{job.script.bucket}/{job.venv_s3_path}#environment "
                     f"--conf spark.emr-serverless.driverEnv.PYSPARK_DRIVER_PYTHON=./environment/bin/python "
                     f"--conf spark.emr-serverless.driverEnv.PYSPARK_PYTHON=./environment/bin/python "
