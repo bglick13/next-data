@@ -1,8 +1,30 @@
 examples/default/.env
 nextdata/templates/default/venv
-*.pyc
-**__pycache__
+# Python
 __pycache__/
-**.env
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.env
+!nextdata/templates/default/{{cookiecutter.project_slug}}/.env
 **.DS_Store
 **.csv
+
+# Version file
+nextdata/_version.py

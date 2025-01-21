@@ -10,7 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { TableMetadata } from "../types";
+import type { TableMetadata } from "../types";
 
 function MetadataLoading() {
   return (

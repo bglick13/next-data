@@ -11,6 +11,11 @@ class StackOutputs(BaseModel):
     table_bucket: dict
     table_namespace: dict
     tables: list[dict]
+    glue_role: dict
+    emr_app: dict
+    emr_script_bucket: dict
+    emr_scripts: list[dict]
+    emr_jobs: list[dict]
 
 
 class SparkSchemaSpec(BaseModel):

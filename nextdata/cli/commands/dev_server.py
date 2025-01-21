@@ -1,6 +1,7 @@
 import asyncio
-import click
+import asyncclick as click
 
+from nextdata.cli.dashboard_installer import DashboardInstaller
 from nextdata.cli.dev_server.main import DevServer
 
 
@@ -22,3 +23,10 @@ def start():
         loop.run_until_complete(dev_server.start_async())
     finally:
         loop.close()
+
+
+@dev_server.command(name="setup")
+def setup():
+    """Setup the dev server"""
+    dashboard_installer = DashboardInstaller()
+    dashboard_installer.install()

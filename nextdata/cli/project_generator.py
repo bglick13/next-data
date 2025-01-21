@@ -57,7 +57,10 @@ class NextDataGenerator:
         # Create context for cookiecutter
         context = {
             "project_name": self.final_app_name,
-            "project_slug": self.final_app_name.lower().replace(" ", "_"),
+            "project_slug": self.final_app_name.lower()
+            .replace(" ", "")
+            .replace("-", "")
+            .replace("_", ""),
         }
 
         click.echo(f"Using template directory: {self.template_dir}")
@@ -72,6 +75,9 @@ class NextDataGenerator:
                     extra_context=context,
                     output_dir=".",
                 )
+            # Add .env file to .gitignore
+            with open(self.app_dir / ".gitignore", "a") as f:
+                f.write("\n.env\n")
         except Exception as e:
             click.echo(f"Error generating project: {str(e)}")
             raise click.ClickException("Failed to generate project")

@@ -13,7 +13,7 @@
     "push": "drizzle-kit push",
     "seed": "npx tsx seed.ts",
     "check": "drizzle-kit check",
-    "get_db_token": "PGPASSWORD=$(aws dsql generate-db-connect-admin-auth-token --region us-east-1 --expires-in 3600 --hostname ruabtw3kk6bprvlivzydznkjsu.dsql.us-east-1.on.aws)"
+    "db:connect": "PGPASSWORD=$(aws dsql generate-db-connect-admin-auth-token --region us-east-1 --expires-in 3600 --hostname ruabtw3kk6bprvlivzydznkjsu.dsql.us-east-1.on.aws) && psql --quiet --username admin --dbname postgres --host ruabtw3kk6bprvlivzydznkjsu.dsql.us-east-1.on.aws"
   },
   "dependencies": {
     "@aws-sdk/dsql-signer": "^3.716.0",
