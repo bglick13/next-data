@@ -1,34 +1,26 @@
 from pathlib import Path
 import importlib.util
 
+from nextdata.core.data.data_table import DataTable
 from nextdata.core.glue.connections.generic_connection import (
     GenericConnectionGlueJobArgs,
 )
+from nextdata.util.ndx_ast import NextDataVisitor
 
 
 def has_custom_glue_job(file_path: Path) -> bool:
-    if file_path.exists():
-        # Check if the etl.py file has a @glue_job decorator by importing and inspecting
-        spec = importlib.util.spec_from_file_location("etl_module", file_path)
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
+    if not file_path.exists():
+        return False
 
-        for attr_name in dir(module):
-            attr = getattr(module, attr_name)
-            # Look for any function decorated with @glue_job
-            if callable(attr) and hasattr(attr, "__wrapped__"):
-                # Check if this function was decorated by glue_job
-                if attr.__wrapped__.__name__ == "glue_job_wrapper":
-                    return True
-    return False
+    visitor = NextDataVisitor(file_path)
+    visitor.visit(visitor.tree)
+    return visitor.has_glue_job
 
 
 def get_connection_name(file_path: Path) -> str:
-    spec = importlib.util.spec_from_file_location("etl_module", file_path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    connection_name = getattr(module, "connection_name", None)
-    return connection_name
+    visitor = NextDataVisitor(file_path)
+    visitor.visit(visitor.tree)
+    return visitor.connection_name
 
 
 def get_connection_args(
@@ -65,7 +57,12 @@ def get_connection_args(
 
 
 def get_incremental_column(file_path: Path) -> str:
-    spec = importlib.util.spec_from_file_location("etl_module", file_path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return getattr(module, "incremental_column", "created_at")
+    visitor = NextDataVisitor(file_path)
+    visitor.visit(visitor.tree)
+    return visitor.incremental_column or "created_at"
+
+
+def get_input_tables(file_path: Path) -> list[str]:
+    visitor = NextDataVisitor(file_path)
+    visitor.visit(visitor.tree)
+    return visitor.input_tables

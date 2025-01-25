@@ -28,6 +28,7 @@ from nextdata.util.framework_magic import (
     get_connection_args,
     get_connection_name,
     get_incremental_column,
+    get_input_tables,
     has_custom_glue_job,
 )
 
@@ -771,7 +772,7 @@ class PulumiContextManager:
             lambda args: args["bucket"]
         )
 
-    def _package_requirements(self, requirements: str) -> str:
+    def _package_requirements(self, requirements: str, job_name: str) -> str:
         """
         Package requirements into a virtualenv using Docker and upload to S3.
         Returns the S3 path to the packaged venv.
@@ -824,9 +825,11 @@ COPY --from=builder /output/venv.tar.gz /
             raise Exception("Failed to extract venv.tar.gz from Docker build")
 
         # Upload to S3
-        venv_key = f"venvs/{self.config.project_slug}-{hash(requirements)}.tar.gz"
+        venv_key = (
+            f"venvs/{self.config.project_slug}-{job_name}-{hash(requirements)}.tar.gz"
+        )
         venv_object = aws.s3.BucketObject(
-            f"venv-{hash(requirements)}",
+            f"venv-{job_name}-{hash(requirements)}",
             bucket=self.glue_job_bucket.id,
             key=venv_key,
             source=pulumi.asset.FileAsset(venv_path),
@@ -873,7 +876,7 @@ COPY --from=builder /output/venv.tar.gz /
         # Package requirements and get S3 path
         with open(Path(__file__).parent / "glue" / "requirements.txt") as f:
             requirements = f.read()
-            venv_s3_path = self._package_requirements(requirements)
+            venv_s3_path = self._package_requirements(requirements, table_path.name)
 
         incremental_column = get_incremental_column(table_path / f"{job_type}.py")
         if job_type == "etl":
@@ -900,10 +903,35 @@ COPY --from=builder /output/venv.tar.gz /
                 )
             )
         elif job_type == "retl":
-            pass
+            input_tables = get_input_tables(table_path / f"{job_type}.py")
+            pulumi.Output.all(
+                script_arn=self._glue_etl_job_script.arn,
+                output_table=self._tables[table_path.name].name,
+            ).apply(
+                lambda args: self.db_manager.add_job(
+                    EmrJob(
+                        name=f"{self.config.project_slug}-{table_path.name}-{job_type}",
+                        job_type=JobType.RETL,
+                        connection_name=connection_name,
+                        connection_type=ConnectionType(connection_args.connection_type),
+                        connection_properties=json.dumps(connection_args.model_dump()),
+                        sql_table=table_path.name,
+                        incremental_column=incremental_column,
+                        is_full_load=True,
+                        script_id=self.db_manager.get_script_by_name(script_key).id,
+                        requirements=requirements,
+                        venv_s3_path=venv_s3_path,
+                    ),
+                    input_tables=[
+                        self.db_manager.get_table_by_name(table_name)
+                        for table_name in input_tables
+                    ],
+                    output_tables=[self.db_manager.get_table_by_name(table_path.name)],
+                )
+            )
 
-    def _discover_etl_scripts(self):
-        """Discover etl scripts in the data directory and setup glue jobs for them."""
+    def _discover_spark_jobs(self):
+        """Discover spark jobs in the data directory and setup glue jobs for them."""
         for table_path in self.config.data_dir.iterdir():
             # Check if the table path is a directory. If so, check if there's an etl.py file.
             if table_path.is_dir():
@@ -911,13 +939,16 @@ COPY --from=builder /output/venv.tar.gz /
                 if etl_script_path.exists():
                     self._setup_glue_job(table_path, "etl")
 
+                retl_script_path = table_path / "retl.py"
+                if retl_script_path.exists():
+                    self._setup_glue_job(table_path, "retl")
+
     def _construct_pulumi_program(self):
         """Initial program for stack creation"""
         self._ensure_base_resources()
         self._ensure_existing_tables()
         self._setup_glue()
-        # self._setup_lakeformation()
-        self._discover_etl_scripts()
+        self._discover_spark_jobs()
 
     def create_stack(self):
         """Create or update the entire stack"""

@@ -1,8 +1,10 @@
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 
 from nextdata.core.glue.connections.generic_connection import (
     GenericConnectionGlueJobArgs,
 )
+from sqlalchemy import create_engine
+from pyspark.sql import DataFrame
 
 
 class JDBCGlueJobArgs(GenericConnectionGlueJobArgs):
@@ -17,3 +19,9 @@ class JDBCGlueJobArgs(GenericConnectionGlueJobArgs):
     database: str
     username: str
     password: Optional[str] = None
+
+
+class RemoteDBConnection:
+    def __init__(self, url: str, connect_args: dict[str, Any]):
+        self.url = url
+        self.engine = create_engine(url, connect_args=connect_args)

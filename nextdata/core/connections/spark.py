@@ -3,7 +3,6 @@ from typing import Literal, Optional
 from pyspark.sql import DataFrame, SparkSession
 
 from nextdata.cli.types import SparkSchemaSpec
-from nextdata.core.pulumi_context_manager import PulumiContextManager
 from nextdata.util.s3_tables_utils import get_s3_table_path
 
 
@@ -14,6 +13,8 @@ class SparkManager:
         namespace: Optional[str] = None,
     ):
         if not bucket_arn or not namespace:
+            from nextdata.core.pulumi_context_manager import PulumiContextManager
+
             bucket_arn, namespace = PulumiContextManager.get_connection_info()
         self.bucket_arn = bucket_arn
         self.namespace = namespace
@@ -108,8 +109,8 @@ class SparkManager:
         if limit:
             return self.spark.sql(
                 f"SELECT * FROM {table_path} LIMIT {limit} OFFSET {offset}"
-            ).collect()
-        return self.spark.sql(f"SELECT * FROM {table_path}").collect()
+            )
+        return self.spark.sql(f"SELECT * FROM {table_path}")
 
     def read_from_csv(self, file_path: str) -> DataFrame:
         """Read data from a CSV file"""

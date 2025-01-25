@@ -158,7 +158,7 @@ async def get_sample_data(
         table_name,
         limit,
         offset,
-    )
+    ).collect()
 
 
 @app.post("/api/jobs/trigger")
@@ -216,6 +216,7 @@ async def trigger_job(
     logging.error(f"Connection Properties:\n{job.connection_properties}")
     args = GlueJobArgs(
         job_name=job.name,
+        job_type=job.job_type.value,
         connection_name=job.connection_name,
         connection_type=job.connection_type.value,
         connection_properties=job.connection_properties,

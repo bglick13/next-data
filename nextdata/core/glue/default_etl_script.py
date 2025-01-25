@@ -178,7 +178,6 @@ def main(
         job_args.incremental_column,
     )
     print(f"Partition strategy: {partition_strategy}")
-
     if partition_strategy.type == "numeric":
         source_df: DataFrame = spark_manager.spark.read.jdbc(
             url=connection_options["url"],

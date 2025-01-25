@@ -6,9 +6,13 @@ import json
 
 from pydantic import BaseModel, ConfigDict, field_validator
 from typing import Any, Callable, Literal, Optional, TypeVar
+from pyspark.sql import DataFrame
 from functools import wraps
 import argparse
 from nextdata.core.connections.spark import SparkManager
+from nextdata.core.glue.connections.dsql import DSQLGlueJobArgs, generate_dsql_password
+from nextdata.core.glue.connections.jdbc import JDBCGlueJobArgs, RemoteDBConnection
+from nextdata.core.glue.connections.retl_connection import RetlDbConnection
 
 T = TypeVar("T")
 SupportedConnectionTypes = Literal[
@@ -42,6 +46,7 @@ class GlueJobArgs(BaseModel):
     """
 
     job_name: str
+    job_type: Literal["etl", "retl"]
     connection_name: str
     connection_type: SupportedConnectionTypes
     connection_properties: dict[str, Any]
@@ -70,6 +75,28 @@ class GlueJobArgs(BaseModel):
         return v.lower() == "true"
 
 
+ConnectionClassType = TypeVar("ConnectionClassType", bound=RemoteDBConnection)
+
+
+def get_db_connection_from_args(
+    job_args: GlueJobArgs, connection_class: type[ConnectionClassType]
+) -> ConnectionClassType:
+    connect_args = {}
+    if job_args.connection_type == "dsql":
+        connection_args: dict[str, Any] = job_args.connection_properties
+        connection_conf = DSQLGlueJobArgs(host=connection_args["host"])
+        password = generate_dsql_password(connection_conf.host)
+        connect_args["ssl"] = True
+        connect_args["sslmode"] = "require"
+    elif job_args.connection_type == "jdbc":
+        connection_conf = JDBCGlueJobArgs(**job_args.connection_properties)
+        password = connection_conf.password
+    else:
+        raise ValueError(f"Unsupported connection type: {job_args.connection_type}")
+    url = f"{connection_conf.protocol}://{connection_conf.username}:{password}@{connection_conf.host}:{connection_conf.port}/{connection_conf.database}"
+    return connection_class(url, connect_args)
+
+
 def glue_job(JobArgsType: type[GlueJobArgs] = GlueJobArgs):
     def decorator(func: Callable[[SparkManager, JobArgsType], T]) -> Callable[..., T]:
         @wraps(func)
@@ -95,6 +122,13 @@ def glue_job(JobArgsType: type[GlueJobArgs] = GlueJobArgs):
                 )
                 # TODO: If job is retl, add logic to write to db
                 # TODO: Add tracking for retl output table names and cleanup old tables when new job is run
+                if job_args_resolved.job_type == "retl" and isinstance(
+                    result, DataFrame
+                ):
+                    remote_db_connection = get_db_connection_from_args(
+                        job_args_resolved, RetlDbConnection
+                    )
+                    remote_db_connection.write_retl_result(result)
                 return result
             except Exception as e:
                 # Log any errors and ensure job fails properly

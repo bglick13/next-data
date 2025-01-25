@@ -1,4 +1,3 @@
-from examples.default.connections.dsql.main import DSQLConnection
 from nextdata.core.connections.spark import SparkManager
 from nextdata.core.data.data_table import DataTable
 from pyspark.sql import DataFrame
@@ -6,12 +5,15 @@ import tempfile
 import os
 from sqlalchemy import text
 
+from nextdata.core.glue.glue_entrypoint import GlueJobArgs, glue_job
 
-def main():
+
+@glue_job(JobArgsType=GlueJobArgs)
+def main(spark_manager: SparkManager, job_args: GlueJobArgs):
     """
     Write the entire books data table to the database efficiently using PostgreSQL COPY command.
     """
-    spark = SparkManager().spark
+    spark = spark_manager.spark
     books = DataTable("books", spark)
     all_books = books.df
 
