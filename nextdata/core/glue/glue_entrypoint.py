@@ -1,16 +1,14 @@
-"""
-Decorator for glue jobs. Handles some of the boilerplate for glue jobs.
-"""
+"""Decorator for glue jobs. Handles some of the boilerplate for glue jobs."""
 
+import argparse
 import json
+from functools import wraps
+from typing import Any, Callable, Literal, Optional, TypeVar
 
 from pydantic import BaseModel, ConfigDict, field_validator
-from typing import Any, Callable, Literal, Optional, TypeVar
 from pyspark.sql import DataFrame
-from functools import wraps
-import argparse
-
 from sqlalchemy import URL
+
 from nextdata.core.connections.spark import SparkManager
 from nextdata.core.glue.connections.dsql import DSQLGlueJobArgs, generate_dsql_password
 from nextdata.core.glue.connections.jdbc import JDBCGlueJobArgs, RemoteDBConnection
@@ -18,12 +16,17 @@ from nextdata.core.glue.connections.retl_connection import RetlDbConnection
 
 T = TypeVar("T")
 SupportedConnectionTypes = Literal[
-    "s3", "redshift", "snowflake", "athena", "jdbc", "dsql"
+    "s3",
+    "redshift",
+    "snowflake",
+    "athena",
+    "jdbc",
+    "dsql",
 ]
 
 
 def add_model(parser: argparse.ArgumentParser, model: BaseModel):
-    "Add Pydantic model to an ArgumentParser"
+    """Add Pydantic model to an ArgumentParser"""
     fields = model.model_fields
     for name, field in fields.items():
         parser.add_argument(
@@ -81,7 +84,8 @@ ConnectionClassType = TypeVar("ConnectionClassType", bound=RemoteDBConnection)
 
 
 def get_db_connection_from_args(
-    job_args: GlueJobArgs, connection_class: type[ConnectionClassType]
+    job_args: GlueJobArgs,
+    connection_class: type[ConnectionClassType],
 ) -> ConnectionClassType:
     connect_args = {}
     url = None
@@ -132,16 +136,18 @@ def glue_job(JobArgsType: type[GlueJobArgs] = GlueJobArgs):
                     job_args=job_args_resolved,
                 )
                 if job_args_resolved.job_type == "retl" and isinstance(
-                    result, DataFrame
+                    result,
+                    DataFrame,
                 ):
                     remote_db_connection = get_db_connection_from_args(
-                        job_args_resolved, RetlDbConnection
+                        job_args_resolved,
+                        RetlDbConnection,
                     )
                     remote_db_connection.write_retl_result(result)
                 return result
             except Exception as e:
                 # Log any errors and ensure job fails properly
-                print(f"Error in Glue job: {str(e)}")
+                print(f"Error in Glue job: {e!s}")
                 raise e
 
         return glue_job_wrapper
