@@ -1,9 +1,11 @@
-from pydantic import ValidationError
-import pytest
 import json
-from unittest.mock import Mock, patch, MagicMock
-from nextdata.core.glue.glue_entrypoint import GlueJobArgs, glue_job
+from unittest.mock import MagicMock, Mock, patch
+
+import pytest
+from pydantic import ValidationError
+
 from nextdata.core.connections.spark import SparkManager
+from nextdata.core.glue.glue_entrypoint import GlueJobArgs, glue_job
 
 
 def test_glue_job_args_validation():

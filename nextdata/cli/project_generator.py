@@ -1,10 +1,9 @@
-import os
-import shutil
-from pathlib import Path
-import click
 import importlib.resources
+import os
+from pathlib import Path
+
+import click
 from cookiecutter.main import cookiecutter
-from cookiecutter.generate import generate_context
 from cookiecutter.utils import work_in
 
 
@@ -33,19 +32,17 @@ class NextDataGenerator:
                         if item.is_dir():
                             click.echo(f"  - {item.name}")
                 except Exception as e:
-                    click.echo(f"  Error listing templates: {str(e)}")
+                    click.echo(f"  Error listing templates: {e!s}")
 
             self.template_dir = template_path
 
             # Verify cookiecutter.json exists
             cookiecutter_json = self.template_dir / "cookiecutter.json"
             if not cookiecutter_json.exists():
-                click.echo(
-                    f"Warning: cookiecutter.json not found at {cookiecutter_json}"
-                )
+                click.echo(f"Warning: cookiecutter.json not found at {cookiecutter_json}")
 
         except Exception as e:
-            click.echo(f"Error finding template: {str(e)}")
+            click.echo(f"Error finding template: {e!s}")
             raise click.ClickException("Failed to initialize project generator")
 
     def create_project(self):
@@ -79,7 +76,7 @@ class NextDataGenerator:
             with open(self.app_dir / ".gitignore", "a") as f:
                 f.write("\n.env\n")
         except Exception as e:
-            click.echo(f"Error generating project: {str(e)}")
+            click.echo(f"Error generating project: {e!s}")
             raise click.ClickException("Failed to generate project")
 
         # Initialize git repository

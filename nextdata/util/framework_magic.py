@@ -1,7 +1,6 @@
-from pathlib import Path
 import importlib.util
+from pathlib import Path
 
-from nextdata.core.data.data_table import DataTable
 from nextdata.core.glue.connections.generic_connection import (
     GenericConnectionGlueJobArgs,
 )
@@ -24,11 +23,11 @@ def get_connection_name(file_path: Path) -> str:
 
 
 def get_connection_args(
-    connection_name: str, connections_dir: Path
+    connection_name: str, connections_dir: Path,
 ) -> type[GenericConnectionGlueJobArgs]:
     connection_path = connections_dir / connection_name / "main.py"
     connection_spec = importlib.util.spec_from_file_location(
-        f"connection_{connection_name}", connection_path
+        f"connection_{connection_name}", connection_path,
     )
     connection_module = importlib.util.module_from_spec(connection_spec)
     connection_spec.loader.exec_module(connection_module)
@@ -39,7 +38,7 @@ def get_connection_args(
         if isinstance(attr, GenericConnectionGlueJobArgs):
             connection_args = attr
             break
-        elif isinstance(attr, type) and issubclass(attr, GenericConnectionGlueJobArgs):
+        if isinstance(attr, type) and issubclass(attr, GenericConnectionGlueJobArgs):
             # Find instance of this class in the module
             for instance_name in dir(connection_module):
                 instance = getattr(connection_module, instance_name)
@@ -51,7 +50,7 @@ def get_connection_args(
                 break
     if not connection_args:
         raise ValueError(
-            f"No connection arguments found in {connection_path}. Please add a connection_args variable that inherits from GenericConnectionGlueJobArgs."
+            f"No connection arguments found in {connection_path}. Please add a connection_args variable that inherits from GenericConnectionGlueJobArgs.",
         )
     return connection_args
 

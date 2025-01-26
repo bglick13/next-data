@@ -1,4 +1,5 @@
 import json
+
 import asyncclick as click
 
 from nextdata.core.pulumi_context_manager import PulumiContextManager
@@ -7,7 +8,6 @@ from nextdata.core.pulumi_context_manager import PulumiContextManager
 @click.group()
 def pulumi():
     """Pulumi commands"""
-    pass
 
 
 @pulumi.command(name="up")

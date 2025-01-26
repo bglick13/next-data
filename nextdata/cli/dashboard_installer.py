@@ -1,7 +1,7 @@
-import subprocess
-import shutil
-from pathlib import Path
 import platform
+import shutil
+import subprocess
+from pathlib import Path
 
 
 class DashboardInstaller:

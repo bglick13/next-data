@@ -1,8 +1,8 @@
-import asyncclick as click
-import asyncio
 
-from nextdata.core.pulumi_context_manager import PulumiContextManager
+import asyncclick as click
+
 from nextdata.core.connections.spark import SparkManager
+from nextdata.core.pulumi_context_manager import PulumiContextManager
 
 
 @click.group()
@@ -21,7 +21,7 @@ async def create_session():
         {
             "pulumi_context_manager": pulumi_context_manager,
             "spark": spark_manager,
-        }
+        },
     )
 
     # Start IPython shell for better tab completion
@@ -33,7 +33,7 @@ async def create_session():
         nest_asyncio.apply()
 
         IPython.embed(
-            banner1=f"NextData Spark Session\nAvailable objects:\n- spark: SparkManager\n- stack_outputs: StackOutputs\n- pulumi_context_manager: PulumiContextManager",
+            banner1="NextData Spark Session\nAvailable objects:\n- spark: SparkManager\n- stack_outputs: StackOutputs\n- pulumi_context_manager: PulumiContextManager",
             colors="neutral",
         )
     except ImportError:
@@ -41,6 +41,6 @@ async def create_session():
         import code
 
         code.interact(
-            banner=f"NextData Spark Session\nAvailable objects:\n- spark: SparkManager\n- stack_outputs: StackOutputs\n- pulumi_context_manager: PulumiContextManager",
+            banner="NextData Spark Session\nAvailable objects:\n- spark: SparkManager\n- stack_outputs: StackOutputs\n- pulumi_context_manager: PulumiContextManager",
             local=globals(),
         )

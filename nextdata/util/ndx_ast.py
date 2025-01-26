@@ -5,7 +5,7 @@ from pathlib import Path
 class NextDataVisitor(ast.NodeVisitor):
     def __init__(self, file_path: Path):
         self.file_path = file_path
-        with open(file_path, "r") as f:
+        with open(file_path) as f:
             self.tree = ast.parse(f.read())
         self.has_glue_job = False
         self.connection_name = None
@@ -18,10 +18,7 @@ class NextDataVisitor(ast.NodeVisitor):
             if isinstance(decorator, ast.Name) and decorator.id == "glue_job":
                 self.has_glue_job = True
             elif isinstance(decorator, ast.Call):
-                if (
-                    isinstance(decorator.func, ast.Name)
-                    and decorator.func.id == "glue_job"
-                ):
+                if isinstance(decorator.func, ast.Name) and decorator.func.id == "glue_job":
                     self.has_glue_job = True
         self.generic_visit(node)
 
@@ -31,9 +28,7 @@ class NextDataVisitor(ast.NodeVisitor):
             var_name = node.targets[0].id
             if var_name == "connection_name" and isinstance(node.value, ast.Constant):
                 self.connection_name = node.value.value
-            elif var_name == "incremental_column" and isinstance(
-                node.value, ast.Constant
-            ):
+            elif var_name == "incremental_column" and isinstance(node.value, ast.Constant):
                 self.incremental_column = node.value.value
         self.generic_visit(node)
 

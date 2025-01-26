@@ -1,9 +1,9 @@
-import pytest
-from unittest.mock import Mock, patch, MagicMock, call
 import json
-from pyspark.sql import SparkSession, DataFrame
-from pyspark.sql import functions as F
+from unittest.mock import MagicMock, Mock, patch
+
+import pytest
 from pyspark.context import SparkContext
+from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.column import Column
 
 # Create a single mock for SparkManager that will be used throughout
@@ -28,18 +28,16 @@ mock_jdbc_args_class = MagicMock()
 mock_generate_password_func = MagicMock()
 
 # Patch SparkManager and other dependencies
-with patch(
-    "nextdata.core.connections.spark.SparkManager", return_value=mock_spark_manager
-), patch(
-    "nextdata.core.glue.connections.dsql.DSQLGlueJobArgs", mock_dsql_args_class
-), patch(
-    "nextdata.core.glue.connections.jdbc.JDBCGlueJobArgs", mock_jdbc_args_class
-), patch(
-    "nextdata.core.glue.connections.dsql.generate_dsql_password",
-    mock_generate_password_func,
-), patch(
-    "pyspark.sql.functions.current_date"
-) as mock_current_date:
+with (
+    patch("nextdata.core.connections.spark.SparkManager", return_value=mock_spark_manager),
+    patch("nextdata.core.glue.connections.dsql.DSQLGlueJobArgs", mock_dsql_args_class),
+    patch("nextdata.core.glue.connections.jdbc.JDBCGlueJobArgs", mock_jdbc_args_class),
+    patch(
+        "nextdata.core.glue.connections.dsql.generate_dsql_password",
+        mock_generate_password_func,
+    ),
+    patch("pyspark.sql.functions.current_date") as mock_current_date,
+):
     mock_current_date.return_value = Mock(spec=Column)
     from nextdata.core.glue.default_etl_script import main
 
@@ -77,7 +75,7 @@ def test_main_dsql_connection(mock_parse_args):
         "connection_name": "test_conn",
         "connection_type": "dsql",
         "connection_properties": json.dumps(
-            {"host": "test-host", "port": "5439", "database": "test_db"}
+            {"host": "test-host", "port": "5439", "database": "test_db"},
         ),
         "sql_table": "test_table",
         "bucket_arn": "arn:aws:s3:::test-bucket",
@@ -91,9 +89,7 @@ def test_main_dsql_connection(mock_parse_args):
 
     # Print debug info about mock calls
     print(f"DSQLGlueJobArgs mock calls: {mock_dsql_args_class.mock_calls}")
-    print(
-        f"generate_dsql_password mock calls: {mock_generate_password_func.mock_calls}"
-    )
+    print(f"generate_dsql_password mock calls: {mock_generate_password_func.mock_calls}")
 
     # Verify DSQL configuration was created correctly
     mock_dsql_args_class.assert_called_once_with(host="test-host")
@@ -153,7 +149,7 @@ def test_main_jdbc_connection(mock_parse_args):
                 "database": "test_db",
                 "username": "test_user",
                 "password": "test_pass",
-            }
+            },
         ),
         "sql_table": "test_table",
         "bucket_arn": "arn:aws:s3:::test-bucket",
@@ -166,9 +162,7 @@ def test_main_jdbc_connection(mock_parse_args):
     main(spark_manager=mock_spark_manager)
 
     # Verify JDBC configuration was created correctly
-    mock_jdbc_args_class.assert_called_once_with(
-        **json.loads(mock_args["connection_properties"])
-    )
+    mock_jdbc_args_class.assert_called_once_with(**json.loads(mock_args["connection_properties"]))
 
     # Get the call arguments without accessing the Java properties
     assert mock_jdbc.called, "JDBC read was not called"

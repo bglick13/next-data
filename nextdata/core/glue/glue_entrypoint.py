@@ -1,9 +1,11 @@
 """Decorator for glue jobs. Handles some of the boilerplate for glue jobs."""
 
+from __future__ import annotations
+
 import argparse
 import json
 from functools import wraps
-from typing import Any, Callable, Literal, Optional, TypeVar
+from typing import Any, Callable, Literal, TypeVar, cast
 
 from pydantic import BaseModel, ConfigDict, field_validator
 from pyspark.sql import DataFrame
@@ -14,7 +16,7 @@ from nextdata.core.glue.connections.dsql import DSQLGlueJobArgs, generate_dsql_p
 from nextdata.core.glue.connections.jdbc import JDBCGlueJobArgs, RemoteDBConnection
 from nextdata.core.glue.connections.retl_connection import RetlDbConnection
 
-T = TypeVar("T")
+ReturnType = TypeVar("ReturnType", DataFrame, None)
 SupportedConnectionTypes = Literal[
     "s3",
     "redshift",
@@ -25,8 +27,8 @@ SupportedConnectionTypes = Literal[
 ]
 
 
-def add_model(parser: argparse.ArgumentParser, model: BaseModel):
-    """Add Pydantic model to an ArgumentParser"""
+def add_model(parser: argparse.ArgumentParser, model: type[BaseModel]) -> None:
+    """Add Pydantic model to an ArgumentParser."""
     fields = model.model_fields
     for name, field in fields.items():
         parser.add_argument(
@@ -56,8 +58,8 @@ class GlueJobArgs(BaseModel):
     connection_type: SupportedConnectionTypes
     connection_properties: dict[str, Any]
     sql_table: str
-    incremental_column: Optional[str] = None
-    is_full_load: Optional[bool] = True
+    incremental_column: str | None = None
+    is_full_load: bool | None = True
     bucket_arn: str
     namespace: str
 
@@ -65,16 +67,17 @@ class GlueJobArgs(BaseModel):
 
     # ConnectionProperties comes in as a raw string, so we need to parse it in the validator
     @field_validator("connection_properties", mode="before")
-    def validate_connection_properties(cls, v):
+    def validate_connection_properties(self, v: str) -> dict[str, Any]:
         if isinstance(v, dict):
             return v
         try:
             return json.loads(v)
-        except json.JSONDecodeError:
-            raise ValueError("Invalid connection properties")
+        except json.JSONDecodeError as e:
+            msg = "Invalid connection properties"
+            raise ValueError(msg) from e
 
     @field_validator("is_full_load", mode="before")
-    def validate_is_full_load(cls, v):
+    def validate_is_full_load(self, v: str | bool) -> bool:
         if isinstance(v, bool):
             return v
         return v.lower() == "true"
@@ -108,17 +111,20 @@ def get_db_connection_from_args(
         url = f"{connection_conf.protocol}://{connection_conf.username}:{password}@{connection_conf.host}:{connection_conf.port}/{connection_conf.database}"
 
     else:
-        raise ValueError(f"Unsupported connection type: {job_args.connection_type}")
+        msg = f"Unsupported connection type: {job_args.connection_type}"
+        raise ValueError(msg)
     return connection_class(url, connect_args, **job_args.model_dump())
 
 
-def glue_job(JobArgsType: type[GlueJobArgs] = GlueJobArgs):
-    def decorator(func: Callable[[SparkManager, JobArgsType], T]) -> Callable[..., T]:
+def glue_job(JobArgsType: type[GlueJobArgs] = GlueJobArgs) -> Callable:  # noqa: N803
+    def decorator(
+        func: Callable[[SparkManager, JobArgsType], ReturnType],
+    ) -> Callable[..., ReturnType]:
         @wraps(func)
         def glue_job_wrapper(
-            *args,
-            **kwargs,
-        ) -> T:
+            *args,  # noqa: ARG001
+            **kwargs,  # noqa: ANN003, ARG001
+        ) -> ReturnType:
             parser = argparse.ArgumentParser()
             add_model(parser, JobArgsType)
             job_args = parser.parse_args()
@@ -132,7 +138,7 @@ def glue_job(JobArgsType: type[GlueJobArgs] = GlueJobArgs):
             try:
                 # Call the wrapped function with the initialized contexts
                 result = func(
-                    spark_manager=spark_manager,
+                    spark_manager=spark_manager,  # type: ignore this is right
                     job_args=job_args_resolved,
                 )
                 if job_args_resolved.job_type == "retl" and isinstance(
@@ -144,11 +150,11 @@ def glue_job(JobArgsType: type[GlueJobArgs] = GlueJobArgs):
                         RetlDbConnection,
                     )
                     remote_db_connection.write_retl_result(result)
-                return result
+                return cast(ReturnType, result)
             except Exception as e:
                 # Log any errors and ensure job fails properly
-                print(f"Error in Glue job: {e!s}")
-                raise e
+                msg = f"Error in Glue job: {e!s}"
+                raise ValueError(msg) from e
 
         return glue_job_wrapper
 

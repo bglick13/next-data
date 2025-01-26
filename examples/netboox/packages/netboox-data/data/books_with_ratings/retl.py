@@ -11,15 +11,15 @@ connection_name = "dsql"
 
 
 @glue_job(JobArgsType=GlueJobArgs)
-def main(spark_manager: SparkManager, job_args: GlueJobArgs) -> DataFrame:
+def main(spark_manager: SparkManager, _: GlueJobArgs) -> DataFrame:
     """
     Write the entire books data table to the database efficiently using PostgreSQL COPY command.
     """
-    spark = spark_manager.spark
-    # books = DataTable("books", spark)
-    # ratings = DataTable("ratings", spark)
-    # all_books = books.df
-    # all_ratings = ratings.df
+    # spark = spark_manager.spark  # noqa: ERA001
+    # books = DataTable("books", spark)  # noqa: ERA001
+    # ratings = DataTable("ratings", spark)  # noqa: ERA001
+    # all_books = books.df  # noqa: ERA001
+    # all_ratings = ratings.df  # noqa: ERA001
     all_books = spark_manager.get_table("books")
     all_ratings = spark_manager.get_table("ratings")
     ratings_by_book = all_ratings.groupBy("isbn").agg(
@@ -35,4 +35,4 @@ def main(spark_manager: SparkManager, job_args: GlueJobArgs) -> DataFrame:
 
 
 if __name__ == "__main__":
-    main()
+    main()  # type: ignore this is right

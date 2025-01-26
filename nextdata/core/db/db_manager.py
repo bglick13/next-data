@@ -1,30 +1,36 @@
-from pathlib import Path
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, joinedload
 
 from nextdata.core.db.models import (
-    Base,
-    EmrJobScript,
-    S3DataTable,
-    EmrJob,
     AwsResource,
+    Base,
+    EmrJob,
+    EmrJobScript,
     HumanReadableName,
+    S3DataTable,
 )
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class DatabaseManager:
-    def __init__(self, db_path: Path):
+    def __init__(self, db_path: Path) -> None:
         uri = f"sqlite:///{db_path.resolve()}"
         self.engine = create_engine(uri)
 
-    def create_all(self):
+    def create_all(self) -> None:
         Base.metadata.create_all(self.engine)
 
-    def reset(self):
+    def reset(self) -> None:
         Base.metadata.drop_all(self.engine)
         self.create_all()
 
-    def add_table(self, table: S3DataTable):
+    def add_table(self, table: S3DataTable) -> None:
         with Session(self.engine) as session:
             session.add(table)
             session.commit()
@@ -32,9 +38,9 @@ class DatabaseManager:
     def add_job(
         self,
         job: EmrJob,
-        input_tables: list[S3DataTable] = None,
-        output_tables: list[S3DataTable] = None,
-    ):
+        input_tables: list[S3DataTable] | None = None,
+        output_tables: list[S3DataTable] | None = None,
+    ) -> None:
         with Session(self.engine) as session:
             session.add(job)
             if input_tables:
@@ -43,25 +49,21 @@ class DatabaseManager:
                 job.output_tables.extend(output_tables)
             session.commit()
 
-    def add_resource(self, resource: AwsResource):
+    def add_resource(self, resource: AwsResource) -> None:
         with Session(self.engine) as session:
             session.add(resource)
             session.commit()
 
-    def add_script(self, script: EmrJobScript):
+    def add_script(self, script: EmrJobScript) -> None:
         with Session(self.engine) as session:
             session.add(script)
             session.commit()
 
-    def get_script_by_name(self, script_name: str):
+    def get_script_by_name(self, script_name: str) -> EmrJobScript | None:
         with Session(self.engine) as session:
-            return (
-                session.query(EmrJobScript)
-                .filter(EmrJobScript.name == script_name)
-                .first()
-            )
+            return session.query(EmrJobScript).filter(EmrJobScript.name == script_name).first()
 
-    def get_table_by_name(self, table_name: str):
+    def get_table_by_name(self, table_name: str) -> S3DataTable | None:
         with Session(self.engine) as session:
             # Use joinedload to eagerly load the relationships
             table = (
@@ -78,14 +80,14 @@ class DatabaseManager:
                 session.refresh(table)
                 # Explicitly load the relationships to ensure they're populated
                 session.query(EmrJob).filter(
-                    EmrJob.id.in_([job.id for job in table.upstream_jobs])
+                    EmrJob.id.in_([job.id for job in table.upstream_jobs]),
                 ).all()
                 session.query(EmrJob).filter(
-                    EmrJob.id.in_([job.id for job in table.downstream_jobs])
+                    EmrJob.id.in_([job.id for job in table.downstream_jobs]),
                 ).all()
         return table
 
-    def get_job(self, job_name: str):
+    def get_job(self, job_name: str) -> EmrJob | None:
         with Session(self.engine) as session:
             job = (
                 session.query(EmrJob)
@@ -104,7 +106,7 @@ class DatabaseManager:
                 session.expunge_all()
             return job
 
-    def get_resource_by_name(self, resource_name: HumanReadableName):
+    def get_resource_by_name(self, resource_name: HumanReadableName) -> AwsResource | None:
         with Session(self.engine) as session:
             return (
                 session.query(AwsResource)
@@ -112,26 +114,18 @@ class DatabaseManager:
                 .first()
             )
 
-    def get_resource_by_id(self, resource_id: str):
+    def get_resource_by_id(self, resource_id: str) -> AwsResource | None:
+        with Session(self.engine) as session:
+            return session.query(AwsResource).filter(AwsResource.resource_id == resource_id).first()
+
+    def get_resource_by_arn(self, resource_arn: str) -> AwsResource | None:
         with Session(self.engine) as session:
             return (
-                session.query(AwsResource)
-                .filter(AwsResource.resource_id == resource_id)
-                .first()
+                session.query(AwsResource).filter(AwsResource.resource_arn == resource_arn).first()
             )
 
-    def get_resource_by_arn(self, resource_arn: str):
+    def get_resources_by_type(self, resource_type: str) -> list[AwsResource]:
         with Session(self.engine) as session:
             return (
-                session.query(AwsResource)
-                .filter(AwsResource.resource_arn == resource_arn)
-                .first()
-            )
-
-    def get_resources_by_type(self, resource_type: str):
-        with Session(self.engine) as session:
-            return (
-                session.query(AwsResource)
-                .filter(AwsResource.resource_type == resource_type)
-                .all()
+                session.query(AwsResource).filter(AwsResource.resource_type == resource_type).all()
             )

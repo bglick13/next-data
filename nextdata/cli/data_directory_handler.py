@@ -1,7 +1,8 @@
 from pathlib import Path
-from watchdog.events import FileSystemEventHandler
-import click
 from queue import Queue
+
+import click
+from watchdog.events import FileSystemEventHandler
 
 from nextdata.core.pulumi_context_manager import PulumiContextManager
 
@@ -23,7 +24,7 @@ class DataDirectoryHandler(FileSystemEventHandler):
                     # Queue the event for processing in the main thread
                     self.pulumi_context_manager.handle_table_creation(event.src_path)
             except Exception as e:
-                click.echo(f"❌ Error queueing table creation: {str(e)}", err=True)
+                click.echo(f"❌ Error queueing table creation: {e!s}", err=True)
 
     def on_modified(self, event):
         if event.is_directory:

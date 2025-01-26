@@ -31,6 +31,19 @@ ignore = [
     "ANN001", # missing-type-self
     "ANN002", # missing-type-cls
     "N812",   # lowercase imported as non-lowercase
+    "D100",   # missing docstring
+    "D101",   # missing docstring
+    "D102",   # missing docstring
+    "D103",   # missing module docstring
+    "D107",   # missing module docstring
+    "TRY300", # try-except-pass
+    "G004",   # logging-not-lazy
+    "FA100",
+    "A005",
+    "C901",
+    "S608",   # SQL injection risk (we use trusted table paths)
+    "INP001",
+    "TRY003",
 ]
 
 [tool.ruff.pydocstyle]

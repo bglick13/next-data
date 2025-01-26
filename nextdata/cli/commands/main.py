@@ -1,17 +1,17 @@
 import importlib.resources
 from pathlib import Path
+
 import asyncclick as click
 import dotenv
 
 from nextdata.cli.dashboard_installer import DashboardInstaller
-
-from .spark import spark
 from nextdata.cli.dev_server.main import DevServer
 
 from ..project_generator import NextDataGenerator
-from .pulumi import pulumi
-from .dev_server import dev_server
 from .aws import aws
+from .dev_server import dev_server
+from .pulumi import pulumi
+from .spark import spark
 
 dotenv.load_dotenv(Path.cwd() / ".env")
 
@@ -19,7 +19,6 @@ dotenv.load_dotenv(Path.cwd() / ".env")
 @click.group()
 def cli():
     """NextData (ndx) CLI"""
-    pass
 
 
 cli.add_command(pulumi)
@@ -44,17 +43,15 @@ To get started:
   cd {app_name}
   pip install -r requirements.txt
   ndx dev
-"""
+""",
         )
     except Exception as e:
-        click.echo(f"Error creating project: {str(e)}", err=True)
+        click.echo(f"Error creating project: {e!s}", err=True)
 
 
 @cli.command(name="dev")
 @click.option("--skip-init", is_flag=True, help="Skip initialization of the stack")
-@click.option(
-    "--dashboard-port", type=int, default=3000, help="Port to run the dashboard on"
-)
+@click.option("--dashboard-port", type=int, default=3000, help="Port to run the dashboard on")
 @click.option("--api-port", type=int, default=8000, help="Port to run the API on")
 async def dev(skip_init: bool, dashboard_port: int, api_port: int):
     """Start development server and watch for data changes"""
@@ -62,7 +59,7 @@ async def dev(skip_init: bool, dashboard_port: int, api_port: int):
     dashboard_installer.install()
     dev_server = DevServer()
     await dev_server.start_async(
-        skip_init=skip_init, dashboard_port=dashboard_port, api_port=api_port
+        skip_init=skip_init, dashboard_port=dashboard_port, api_port=api_port,
     )
 
 
@@ -94,7 +91,7 @@ def list_templates():
             click.echo("No templates found")
 
     except Exception as e:
-        click.echo(f"Error listing templates: {str(e)}", err=True)
+        click.echo(f"Error listing templates: {e!s}", err=True)
 
 
 def main():

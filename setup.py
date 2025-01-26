@@ -1,4 +1,6 @@
-from setuptools import setup, find_packages
+from pathlib import Path
+
+from setuptools import find_packages, setup
 
 setup(
     name="nextdata",
@@ -10,7 +12,7 @@ setup(
             "*.next",
             "*.next.*",
             "*.pnpm-lock.yaml",
-        ]
+        ],
     ),
     include_package_data=True,
     install_requires=[
@@ -43,8 +45,8 @@ setup(
     zip_safe=False,
     author="Benjamin Glickenhaus",
     author_email="benglickenhaus@gmail.com",
-    description="NextData is a framework for building data pipelines with a focus on simplicity and scalability.",
-    long_description=open("README.md").read(),
+    description="NextData is a framework for building data pipelines with a focus on simplicity and scalability.",  # noqa: E501
+    long_description=Path("README.md").read_text(),
     long_description_content_type="text/markdown",
     url="https://github.com/bglick13/next-data",
     classifiers=[

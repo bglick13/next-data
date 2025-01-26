@@ -1,4 +1,5 @@
 import asyncio
+
 import asyncclick as click
 
 from nextdata.cli.dashboard_installer import DashboardInstaller
@@ -8,7 +9,6 @@ from nextdata.cli.dev_server.main import DevServer
 @click.group()
 def dev_server():
     """Dev server commands"""
-    pass
 
 
 @dev_server.command(name="start")

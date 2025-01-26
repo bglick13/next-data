@@ -1,19 +1,16 @@
+
 import boto3
-from botocore.exceptions import ClientError
 import pandas as pd
 import pyarrow as pa
-import pyarrow.dataset as ds
+from botocore.exceptions import ClientError
 from pyiceberg.catalog import load_catalog
 from pyiceberg.schema import Schema
 from pyiceberg.types import (
+    LongType,
     NestedField,
     StringType,
     TimestampType,
-    LongType,
 )
-import json
-from typing import Optional, Dict, Any
-from datetime import datetime
 
 
 class S3TablesManager:
@@ -26,17 +23,14 @@ class S3TablesManager:
         # Initialize iceberg catalog
         self.catalog = load_catalog(
             "glue",
-            **{
-                "warehouse": f"s3://tables/{bucket_name}",
-                "region": region,
-            },
+            warehouse=f"s3://tables/{bucket_name}", region=region,
         )
 
     def ensure_table_bucket_exists(self) -> bool:
         """Create table bucket if it doesn't exist"""
         try:
             response = self.s3tables_client.create_table_bucket(
-                Bucket=self.bucket_name, Region=self.region
+                Bucket=self.bucket_name, Region=self.region,
             )
             print(f"Created table bucket: {self.bucket_name}")
             return True
@@ -55,7 +49,7 @@ class S3TablesManager:
             )
             print(f"Created table: {table_name}")
         except Exception as e:
-            print(f"Error creating table: {str(e)}")
+            print(f"Error creating table: {e!s}")
             raise e
 
     def infer_schema_from_data(self, data: pd.DataFrame) -> Schema:
@@ -71,9 +65,7 @@ class S3TablesManager:
                 field_type = StringType()
 
             fields.append(
-                NestedField.required(
-                    field_id=len(fields) + 1, name=column, field_type=field_type
-                )
+                NestedField.required(field_id=len(fields) + 1, name=column, field_type=field_type),
             )
 
         return Schema(*fields)
@@ -145,4 +137,4 @@ class EnhancedDataDirectoryHandler(FileSystemEventHandler):
             table_name = directory.relative_to(self.data_dir).name
             self.s3_manager.sync_directory(directory, table_name)
         except Exception as e:
-            print(f"Error syncing directory: {str(e)}")
+            print(f"Error syncing directory: {e!s}")

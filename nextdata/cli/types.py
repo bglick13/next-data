@@ -1,7 +1,9 @@
-from typing import Literal, Optional
-from fastapi import Form, HTTPException
-from fastapi.encoders import jsonable_encoder
-from pydantic import BaseModel, ValidationError
+from typing import Generic, Literal, Optional, TypeVar
+
+from fastapi import Form
+from pydantic import BaseModel
+
+T = TypeVar("T", bound=BaseModel)
 
 
 class StackOutputs(BaseModel):
@@ -40,15 +42,9 @@ class UploadCsvRequest(BaseModel):
     schema: Optional[SparkSchemaSpec] = None
 
 
-class Checker:
-    def __init__(self, model: BaseModel):
+class Checker(Generic[T]):
+    def __init__(self, model: type[T]) -> None:
         self.model = model
 
-    def __call__(self, data: str = Form(...)):
-        try:
-            return self.model.model_validate_json(data)
-        except ValidationError as e:
-            raise HTTPException(
-                detail=jsonable_encoder(e.errors()),
-                status_code=422,
-            )
+    def __call__(self, data: str = Form(...)) -> T:
+        return self.model.model_validate_json(data)

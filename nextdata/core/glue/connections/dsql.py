@@ -1,5 +1,8 @@
-from typing import Literal
+from __future__ import annotations
+
 import json
+from typing import ClassVar, Literal
+
 import boto3
 
 from nextdata.core.glue.connections.jdbc import JDBCGlueJobArgs
@@ -10,14 +13,11 @@ def generate_dsql_password(host: str) -> str:
     config = NextDataConfig.from_env()
     region = config.aws_region if config else "us-east-1"
     client = boto3.client("dsql", region_name=region)
-    token = client.generate_db_connect_admin_auth_token(host, region)
-    return token
+    return client.generate_db_connect_admin_auth_token(host, region)
 
 
 class DSQLGlueJobArgs(JDBCGlueJobArgs):
-    """
-    Arguments for a glue job that uses a DSQL connection.
-    """
+    """Arguments for a glue job that uses a DSQL connection."""
 
     connection_type: Literal["dsql"] = "dsql"
     protocol: Literal["postgresql"] = "postgresql"
@@ -25,8 +25,8 @@ class DSQLGlueJobArgs(JDBCGlueJobArgs):
     port: int = 5432
     database: str = "postgres"
     username: str = "admin"
-    password: str = None
-    required_iam_policies: dict[str, str] = {
+    password: str | None = None
+    required_iam_policies: ClassVar[dict[str, str]] = {
         "dsqlconnect": json.dumps(
             {
                 "Version": "2012-10-17",
@@ -41,8 +41,8 @@ class DSQLGlueJobArgs(JDBCGlueJobArgs):
                         ],
                         "Effect": "Allow",
                         "Resource": ["*"],
-                    }
+                    },
                 ],
-            }
-        )
+            },
+        ),
     }

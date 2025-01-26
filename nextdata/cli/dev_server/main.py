@@ -1,12 +1,14 @@
 import asyncio
+import importlib.resources
 import queue
+import subprocess
+import sys
 import threading
 import time
+
 import click
-import subprocess
-import importlib.resources
-import sys
 from watchdog.observers import Observer
+
 from nextdata.cli.data_directory_handler import DataDirectoryHandler
 from nextdata.core.project_config import NextDataConfig
 
@@ -17,9 +19,7 @@ class DevServer:
     def __init__(self):
         self.config = NextDataConfig.from_env()
         self.dashboard_path = importlib.resources.files("nextdata") / "dashboard"
-        self.backend_path = (
-            importlib.resources.files("nextdata") / "dev_server" / "backend"
-        )
+        self.backend_path = importlib.resources.files("nextdata") / "dev_server" / "backend"
         self.event_queue = queue.Queue()
         self.should_stop = threading.Event()
         self.observer = None
@@ -63,7 +63,7 @@ class DevServer:
             click.echo(f"Starting dashboard from: {self.dashboard_path}")
 
             # Check if pnpm is installed
-            if subprocess.run(["which", "pnpm"], capture_output=True).returncode != 0:
+            if subprocess.run(["which", "pnpm"], capture_output=True, check=False).returncode != 0:
                 click.echo("Installing pnpm...")
                 await asyncio.create_subprocess_exec("npm", "install", "-g", "pnpm")
 
@@ -71,14 +71,12 @@ class DevServer:
             if not (self.dashboard_path / "node_modules").exists():
                 click.echo("Installing dashboard dependencies...")
                 proc = await asyncio.create_subprocess_exec(
-                    "pnpm", "install", cwd=self.dashboard_path
+                    "pnpm", "install", cwd=self.dashboard_path,
                 )
                 await proc.wait()
 
             # Start the dev server
-            click.echo(
-                f"Starting Next.js development server on port {dashboard_port}..."
-            )
+            click.echo(f"Starting Next.js development server on port {dashboard_port}...")
             self.frontend_process = await asyncio.create_subprocess_exec(
                 "pnpm",
                 "run",
@@ -105,7 +103,7 @@ class DevServer:
             )
 
         except Exception as e:
-            click.echo(f"Error starting frontend server: {str(e)}", err=True)
+            click.echo(f"Error starting frontend server: {e!s}", err=True)
             raise
 
     async def start_backend(self, api_port: int):
@@ -150,15 +148,11 @@ class DevServer:
         """Start both frontend and backend servers"""
         try:
             # Run both servers concurrently
-            self.watcher_thread = threading.Thread(
-                target=self._run_file_watcher, daemon=True
-            )
+            self.watcher_thread = threading.Thread(target=self._run_file_watcher, daemon=True)
             self.watcher_thread.start()
-            await asyncio.gather(
-                self.start_frontend(dashboard_port), self.start_backend(api_port)
-            )
+            await asyncio.gather(self.start_frontend(dashboard_port), self.start_backend(api_port))
         except Exception as e:
-            click.echo(f"Error starting development servers: {str(e)}", err=True)
+            click.echo(f"Error starting development servers: {e!s}", err=True)
             await self.stop_async()
             raise
 
@@ -191,7 +185,7 @@ class DevServer:
                 self.backend_process = None
 
         except Exception as e:
-            click.echo(f"Error during server shutdown: {str(e)}", err=True)
+            click.echo(f"Error during server shutdown: {e!s}", err=True)
             # Still try to clean up
             if self.frontend_process:
                 self.frontend_process.kill()
