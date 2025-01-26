@@ -94,7 +94,7 @@ def get_db_connection_from_args(
     else:
         raise ValueError(f"Unsupported connection type: {job_args.connection_type}")
     url = f"{connection_conf.protocol}://{connection_conf.username}:{password}@{connection_conf.host}:{connection_conf.port}/{connection_conf.database}"
-    return connection_class(url, connect_args)
+    return connection_class(url, connect_args, **job_args.model_dump())
 
 
 def glue_job(JobArgsType: type[GlueJobArgs] = GlueJobArgs):

@@ -29,7 +29,7 @@ MarkupSafe==3.0.2
 matplotlib-inline==0.1.7
 mdurl==0.1.2
 nest-asyncio==1.6.0
-nextdata==0.1.13
+nextdata==0.1.15
 parso==0.8.4
 parver==0.5
 pexpect==4.9.0

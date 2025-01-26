@@ -38,5 +38,5 @@ class NextDataConfig(BaseModel):
     def get_available_connections(self) -> list[str]:
         return [f.name for f in self.connections_dir.iterdir() if f.is_dir()]
 
-    def get_available_tables(self) -> list[str]:
-        return [f.name for f in self.data_dir.iterdir() if f.is_dir()]
+    def get_available_tables(self) -> set[str]:
+        return {f.name for f in self.data_dir.iterdir() if f.is_dir()}

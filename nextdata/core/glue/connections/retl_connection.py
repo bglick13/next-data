@@ -1,4 +1,5 @@
 import datetime
+from typing import Any
 from nextdata.core.glue.connections.jdbc import RemoteDBConnection
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.orm import mapped_column
@@ -74,10 +75,10 @@ class RetlOutputHistory(Base):
 
 
 class RetlDbConnection(RemoteDBConnection):
-    def __init__(self, base_table_name: str):
-        super().__init__()
+    def __init__(self, url: str, connect_args: dict[str, Any], **kwargs):
+        super().__init__(url, connect_args)
         self.retl_output_history_table = "retl_output_history"
-        self.base_table_name = base_table_name
+        self.base_table_name = kwargs["sql_table"]
         self.timestamp = datetime.datetime.now()
         self.timestamp_str = self.timestamp.strftime("%Y%m%d%H%M%S")
         self.timestamped_table_name = f"{self.base_table_name}_{self.timestamp_str}"
@@ -104,13 +105,14 @@ class RetlDbConnection(RemoteDBConnection):
 
     def write_to_table(self, df: DataFrame) -> None:
         """Write data to a table"""
-        self.create_table_from_df(df)
+        first_column = df.columns[0]
         df.toPandas().to_sql(
             self.timestamped_table_name,
             self.engine,
             if_exists="replace",
             chunksize=10000,
-            index=False,
+            index=True,
+            index_label=first_column,
         )
 
     def add_to_retl_output_history(self) -> None:

@@ -22,6 +22,6 @@ class JDBCGlueJobArgs(GenericConnectionGlueJobArgs):
 
 
 class RemoteDBConnection:
-    def __init__(self, url: str, connect_args: dict[str, Any]):
+    def __init__(self, url: str, connect_args: dict[str, Any], **kwargs):
         self.url = url
         self.engine = create_engine(url, connect_args=connect_args)
