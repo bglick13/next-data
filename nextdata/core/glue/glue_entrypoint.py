@@ -9,6 +9,8 @@ from typing import Any, Callable, Literal, Optional, TypeVar
 from pyspark.sql import DataFrame
 from functools import wraps
 import argparse
+
+from sqlalchemy import URL
 from nextdata.core.connections.spark import SparkManager
 from nextdata.core.glue.connections.dsql import DSQLGlueJobArgs, generate_dsql_password
 from nextdata.core.glue.connections.jdbc import JDBCGlueJobArgs, RemoteDBConnection
@@ -82,18 +84,27 @@ def get_db_connection_from_args(
     job_args: GlueJobArgs, connection_class: type[ConnectionClassType]
 ) -> ConnectionClassType:
     connect_args = {}
+    url = None
     if job_args.connection_type == "dsql":
         connection_args: dict[str, Any] = job_args.connection_properties
         connection_conf = DSQLGlueJobArgs(host=connection_args["host"])
         password = generate_dsql_password(connection_conf.host)
-        connect_args["ssl"] = True
         connect_args["sslmode"] = "require"
+        connect_args["connect_timeout"] = 60
+        url = URL.create(
+            "postgresql",
+            username="admin",
+            password=password,
+            host=connection_conf.host,
+            database="postgres",
+        )
     elif job_args.connection_type == "jdbc":
         connection_conf = JDBCGlueJobArgs(**job_args.connection_properties)
         password = connection_conf.password
+        url = f"{connection_conf.protocol}://{connection_conf.username}:{password}@{connection_conf.host}:{connection_conf.port}/{connection_conf.database}"
+
     else:
         raise ValueError(f"Unsupported connection type: {job_args.connection_type}")
-    url = f"{connection_conf.protocol}://{connection_conf.username}:{password}@{connection_conf.host}:{connection_conf.port}/{connection_conf.database}"
     return connection_class(url, connect_args, **job_args.model_dump())
 
 
@@ -120,8 +131,6 @@ def glue_job(JobArgsType: type[GlueJobArgs] = GlueJobArgs):
                     spark_manager=spark_manager,
                     job_args=job_args_resolved,
                 )
-                # TODO: If job is retl, add logic to write to db
-                # TODO: Add tracking for retl output table names and cleanup old tables when new job is run
                 if job_args_resolved.job_type == "retl" and isinstance(
                     result, DataFrame
                 ):

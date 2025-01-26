@@ -1,0 +1,9 @@
+{
+    "name": "netboox-data",
+    "version": "0.0.1",
+    "main": "src/index.ts",
+    "type": "module",
+    "scripts": {
+        "dev": "ndx dev --dashboard-port 3001"
+    }
+}

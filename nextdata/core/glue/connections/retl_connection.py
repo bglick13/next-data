@@ -84,7 +84,9 @@ class RetlDbConnection(RemoteDBConnection):
         self.timestamped_table_name = f"{self.base_table_name}_{self.timestamp_str}"
         # Create the retl_output_history table if it doesn't exist
         table_view = view(
-            self.base_table_name, Base.metadata, table(self.timestamped_table_name)
+            self.base_table_name,
+            Base.metadata,
+            sa.select("*").select_from(table(self.timestamped_table_name)),
         )
         metadata = Base.metadata
         metadata.create_all(self.engine)
