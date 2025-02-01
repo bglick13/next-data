@@ -817,6 +817,8 @@ class PulumiContextManager:
 
         # Write requirements to a file
         requirements_path = Path(venv_dir) / "requirements.txt"
+        # Change working directory to the next-data project - this is only for dev, remove before merging
+        os.chdir(Path(__file__).parent.parent.parent)
         with requirements_path.open("w") as f:
             f.write(requirements)
             f.write("\nvenv-pack==0.2.0")
@@ -835,6 +837,14 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 RUN python3 -m pip install --upgrade pip
 
 COPY requirements.txt /requirements.txt
+# copy the entire next-data project into the docker container and install
+COPY . /next-data/
+WORKDIR /next-data
+# Debug: List contents of /next-data directory
+RUN ls -la /next-data && \
+    ls -la / && \
+    pwd
+RUN python3 -m pip install -e .
 RUN python3 -m pip install -r /requirements.txt
 
 RUN mkdir /output && venv-pack -o /output/venv.tar.gz
@@ -993,6 +1003,12 @@ COPY --from=builder /output/venv.tar.gz /
         self.db_manager.reset()
         self.initialize_stack()
         return self.stack.up(on_output=lambda msg: click.echo(f"Pulumi: {msg}"))
+
+    def cancel_update(self) -> None:
+        """Create or update the entire stack."""
+        self.db_manager.reset()
+        self.initialize_stack()
+        self.stack.cancel()
 
     def preview_stack(self) -> pulumi.automation.PreviewResult:
         """Preview the stack."""

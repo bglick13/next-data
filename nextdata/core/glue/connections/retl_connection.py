@@ -25,9 +25,7 @@ class DropView(DDLElement):
 
 @compiler.compiles(CreateView)
 def _create_view(element, compiler, **kw: dict[str, Any]) -> str:  # noqa: ARG001
-    return f"CREATE VIEW {element.name} AS {
-        compiler.sql_compiler.process(element.selectable, literal_binds=True)
-    }"
+    return f"CREATE VIEW {element.name} AS {compiler.sql_compiler.process(element.selectable, literal_binds=True)}"  # noqa: E501
 
 
 @compiler.compiles(DropView)

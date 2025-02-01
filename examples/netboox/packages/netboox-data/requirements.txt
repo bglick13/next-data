@@ -16,6 +16,7 @@ cookiecutter==2.6.0
 debugpy==1.8.11
 decorator==5.1.1
 dill==0.3.9
+eval-type-backport==0.2.2
 executing==2.1.0
 fastapi==0.115.6
 grpcio==1.66.2
@@ -29,7 +30,7 @@ MarkupSafe==3.0.2
 matplotlib-inline==0.1.7
 mdurl==0.1.2
 nest-asyncio==1.6.0
-nextdata==0.1.17
+nextdata==0.1.19
 parso==0.8.4
 parver==0.5
 pexpect==4.9.0

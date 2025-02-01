@@ -6,9 +6,8 @@ import dotenv
 
 from nextdata.cli.dashboard_installer import DashboardInstaller
 from nextdata.cli.dev_server.main import DevServer
+from nextdata.cli.project_generator import NextDataGenerator
 
-from ..project_generator import NextDataGenerator
-from .aws import aws
 from .dev_server import dev_server
 from .pulumi import pulumi
 from .spark import spark
@@ -17,21 +16,20 @@ dotenv.load_dotenv(Path.cwd() / ".env")
 
 
 @click.group()
-def cli():
-    """NextData (ndx) CLI"""
+def cli() -> None:
+    """NextData (ndx) CLI."""
 
 
 cli.add_command(pulumi)
 cli.add_command(dev_server)
 cli.add_command(spark)
-cli.add_command(aws)
 
 
 @cli.command(name="create-ndx-app")
 @click.argument("app_name")
 @click.option("--template", default="default", help="Template to use for the project")
-def create_app(app_name: str, template: str):
-    """Create a new NextData application"""
+def create_app(app_name: str, template: str) -> None:
+    """Create a new NextData application."""
     try:
         generator = NextDataGenerator(app_name, template)
         generator.create_project()
@@ -45,7 +43,7 @@ To get started:
   ndx dev
 """,
         )
-    except Exception as e:
+    except ValueError as e:
         click.echo(f"Error creating project: {e!s}", err=True)
 
 
@@ -53,19 +51,21 @@ To get started:
 @click.option("--skip-init", is_flag=True, help="Skip initialization of the stack")
 @click.option("--dashboard-port", type=int, default=3000, help="Port to run the dashboard on")
 @click.option("--api-port", type=int, default=8000, help="Port to run the API on")
-async def dev(skip_init: bool, dashboard_port: int, api_port: int):
-    """Start development server and watch for data changes"""
+async def dev(skip_init: bool, dashboard_port: int, api_port: int) -> None:  # noqa: FBT001
+    """Start development server and watch for data changes."""
     dashboard_installer = DashboardInstaller()
     dashboard_installer.install()
     dev_server = DevServer()
     await dev_server.start_async(
-        skip_init=skip_init, dashboard_port=dashboard_port, api_port=api_port,
+        skip_init=skip_init,
+        dashboard_port=dashboard_port,
+        api_port=api_port,
     )
 
 
 @cli.command(name="list-templates")
-def list_templates():
-    """List available templates"""
+def list_templates() -> None:
+    """List available templates."""
     try:
         templates_path = importlib.resources.files("nextdata") / "templates"
         templates = [item.name for item in templates_path.iterdir() if item.is_dir()]
@@ -76,10 +76,10 @@ def list_templates():
                 # Check if template has a description in its cookiecutter.json
                 template_json = templates_path / template / "cookiecutter.json"
                 description = "No description available"
-                if template_json.exists():
+                if template_json.is_file():
                     import json
 
-                    with open(template_json) as f:
+                    with Path(template_json.name).open() as f:
                         try:
                             data = json.load(f)
                             description = data.get("description", description)
@@ -90,11 +90,11 @@ def list_templates():
         else:
             click.echo("No templates found")
 
-    except Exception as e:
+    except ValueError as e:
         click.echo(f"Error listing templates: {e!s}", err=True)
 
 
-def main():
+def main() -> None:
     cli()
 
 

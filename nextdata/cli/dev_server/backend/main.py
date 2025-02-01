@@ -10,7 +10,6 @@ import boto3
 from fastapi import Depends, FastAPI, File, Form, Query, UploadFile
 from fastapi import Path as FastAPI_Path
 from fastapi.middleware.cors import CORSMiddleware
-from pyspark.sql import Row
 
 from nextdata.cli.dev_server.backend.deps.get_db import get_db_dependency
 from nextdata.cli.types import Checker, UploadCsvRequest
@@ -150,14 +149,18 @@ async def get_table_metadata(
 async def get_sample_data(
     spark: Annotated[SparkManager, Depends(pyspark_connection_dependency)],
     table_name: Annotated[str, FastAPI_Path(...)],
-    limit: Annotated[int, Query(10)],
-    offset: Annotated[int, Query(0)],
-) -> list[Row]:
-    return spark.read_from_table(
-        table_name,
-        limit,
-        offset,
-    ).collect()
+    limit: Annotated[int, Query()] = 10,
+    offset: Annotated[int, Query()] = 0,
+) -> list[dict]:
+    return (
+        spark.read_from_table(
+            table_name,
+            limit,
+            offset,
+        )
+        .toPandas()
+        .to_dict(orient="records")
+    )
 
 
 @app.post("/api/jobs/trigger")
@@ -182,7 +185,7 @@ async def trigger_job(
         RoleSessionName="dashboard-job-trigger",
     )
     s3_bucket_arn = s3_bucket.resource_arn
-    s3_bucket_namespace = s3_namespace.resource_arn
+    s3_bucket_namespace = s3_namespace.name
 
     # Create EMR client with the assumed role credentials
     emr_client = boto3.client(
@@ -234,9 +237,12 @@ async def trigger_job(
             fixed_value = str(value).lower()  # Convert True/False to 'true'/'false'
         elif isinstance(value, str) and " " in value:
             fixed_value = f"'{value}'"  # Wrap strings containing spaces in quotes
+        else:
+            fixed_value = str(value)
         args_list.append(f"--{name}")  # Add argument name separately
         args_list.append(str(fixed_value))  # Add value separately
     logging.error(f"Args List:\n{args_list}")
+    logging.error(f"Job: {job.__dict__}")
     packages = [
         "org.postgresql:postgresql:42.6.0",
         "org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.6.1",

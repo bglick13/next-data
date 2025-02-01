@@ -67,7 +67,7 @@ class GlueJobArgs(BaseModel):
 
     # ConnectionProperties comes in as a raw string, so we need to parse it in the validator
     @field_validator("connection_properties", mode="before")
-    def validate_connection_properties(self, v: str) -> dict[str, Any]:
+    def validate_connection_properties(cls, v: str) -> dict[str, Any]:  # noqa: N805
         if isinstance(v, dict):
             return v
         try:
@@ -77,7 +77,7 @@ class GlueJobArgs(BaseModel):
             raise ValueError(msg) from e
 
     @field_validator("is_full_load", mode="before")
-    def validate_is_full_load(self, v: str | bool) -> bool:
+    def validate_is_full_load(cls, v: str | bool) -> bool:  # noqa: N805
         if isinstance(v, bool):
             return v
         return v.lower() == "true"
