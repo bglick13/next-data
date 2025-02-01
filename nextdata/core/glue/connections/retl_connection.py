@@ -74,12 +74,6 @@ class RetlDbConnection(RemoteDBConnection):
         self.timestamp = datetime.datetime.now(datetime.timezone.utc)
         self.timestamp_str = self.timestamp.strftime("%Y%m%d%H%M%S")
         self.timestamped_table_name = f"{self.base_table_name}_{self.timestamp_str}"
-        # Create the retl_output_history table if it doesn't exist
-        view(
-            self.base_table_name,
-            Base.metadata,
-            sa.select("*").select_from(table(self.timestamped_table_name)),
-        )
         metadata = Base.metadata
         metadata.create_all(self.engine)
 
@@ -131,5 +125,12 @@ class RetlDbConnection(RemoteDBConnection):
     def write_retl_result(self, df: DataFrame) -> None:
         """Write the result of a retl job to the retl output table."""
         self.write_to_table(df)
+        view(
+            self.base_table_name,
+            Base.metadata,
+            sa.select("*").select_from(table(self.timestamped_table_name)),
+        )
+        metadata = Base.metadata
+        metadata.create_all(self.engine)
         self.add_to_retl_output_history()
         self.cleanup_old_tables(keep_n_tables=3)

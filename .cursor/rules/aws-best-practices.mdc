@@ -1,0 +1,11 @@
+---
+description: Creating or using AWS resources
+globs: nextdata/core**
+---
+
+# Creating AWS resources
+
+- We use Pulumi to define resources for a next-data project. The logic for detecting and creating these resources is in [pulumi_context_manager.py](mdc:nextdata/core/pulumi_context_manager.py)
+- Always follow best practices for security and auth on AWS
+- Always try to define the most efficient pattern for accompishing a task on AWS
+- Keep in mind networking efficiency. This is particularly important when connecting to third party database vendors for ETL or reverse ETL jobs. When possible, prevent data from exiting and re-entering aws networking to minimize costs and latency

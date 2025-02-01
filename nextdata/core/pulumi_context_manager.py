@@ -741,63 +741,6 @@ class PulumiContextManager:
         self._tables[safe_name] = table
         click.echo(f"Creating table for {table_name}")
 
-    def _setup_lakeformation(self) -> None:
-        """Grant lakeformation permissions to the principal so analytics integration works."""
-        # 1. Create Lake Formation service role
-        lake_formation_service_role = aws.iam.Role(
-            "lake-formation-service-role",
-            assume_role_policy=json.dumps(
-                {
-                    "Version": "2012-10-17",
-                    "Statement": [
-                        {
-                            "Effect": "Allow",
-                            "Principal": {"Service": "lakeformation.amazonaws.com"},
-                            "Action": "sts:AssumeRole",
-                        },
-                    ],
-                },
-            ),
-        )
-
-        # 2. Register resources with Lake Formation
-        aws.lakeformation.Resource(
-            "table-bucket-registration",
-            role_arn=lake_formation_service_role.arn,
-            arn=self.table_bucket.arn,
-            use_service_linked_role=True,
-        )
-
-        # 3. Grant Lake Formation permissions for existing Glue database
-        aws.lakeformation.Permissions(
-            "lakeformation-database-permissions",
-            principal=lake_formation_service_role.arn,
-            database=aws.lakeformation.PermissionsDatabaseArgs(
-                name=self.glue_catalog_database.name,
-                catalog_id=self.table_bucket.owner_account_id,
-            ),
-            permissions=["ALL"],
-            opts=pulumi.ResourceOptions(depends_on=[self.glue_catalog_database]),
-        )
-
-        # 4. Grant table permissions for each table
-        if not self.config:
-            msg = "Could not initialize project config"
-            raise ValueError(msg)
-        for table_path in self.config.get_available_tables():
-            table_name = Path(table_path).name
-            aws.lakeformation.Permissions(
-                f"lakeformation-permissions-{table_name}",
-                principal=lake_formation_service_role.arn,
-                table=aws.lakeformation.PermissionsTableArgs(
-                    database_name=self.glue_catalog_database.name,
-                    name=table_name,
-                    catalog_id=self.table_bucket.owner_account_id,
-                ),
-                permissions=["ALL"],
-                opts=pulumi.ResourceOptions(depends_on=[self.glue_catalog_database]),
-            )
-
     def _get_glue_job_bucket_name(self) -> pulumi.Output[str]:
         return pulumi.Output.all(bucket=self.glue_job_bucket.bucket).apply(
             lambda args: args["bucket"],
