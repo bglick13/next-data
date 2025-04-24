@@ -19,7 +19,7 @@ dill==0.3.9
 executing==2.1.0
 fastapi==0.115.6
 grpcio==1.66.2
-h11==0.14.0
+h11==0.16.0
 idna==3.10
 jedi==0.19.2
 Jinja2==3.1.5
