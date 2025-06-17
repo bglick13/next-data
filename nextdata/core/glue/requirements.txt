@@ -34,7 +34,7 @@ parso==0.8.4
 parver==0.5
 pexpect==4.9.0
 prompt_toolkit==3.0.48
-protobuf==4.25.5
+protobuf==4.25.8
 psycopg2-binary==2.9.10
 ptyprocess==0.7.0
 pulumi==3.144.1
